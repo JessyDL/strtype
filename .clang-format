@@ -1,0 +1,70 @@
+---
+Language: Cpp
+Standard: c++20
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: true
+AlignOperands: true
+AlignTrailingComments: true
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
+AlwaysBreakBeforeMultilineStrings: true
+AlwaysBreakTemplateDeclarations: true
+BinPackArguments: false
+BinPackParameters: false
+BraceWrapping:
+  AfterCaseLabel: true
+  AfterEnum: true
+  AfterStruct: true
+  AfterClass: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterUnion: true
+  BeforeCatch: true
+  BeforeElse: true
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+  AfterControlStatement: true
+ColumnLimit: 120
+BreakBeforeBraces: Custom
+Cpp11BracedListStyle: true
+DerivePointerAlignment: false
+MaxEmptyLinesToKeep: 2
+NamespaceIndentation: All
+SpaceAfterCStyleCast: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: Never
+SpaceInEmptyParentheses: false
+SpacesInAngles: false
+SpacesInCStyleCastParentheses: false
+SpacesInContainerLiterals: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+IndentWidth: 4
+TabWidth: 4
+UseTab: Always
+SortIncludes: true
+SpacesBeforeTrailingComments: 4
+SpaceBeforeInheritanceColon: true
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeCpp11BracedList: true
+SpaceAfterTemplateKeyword: true
+SortUsingDeclarations: true
+PointerAlignment: Left
+KeepEmptyLinesAtTheStartOfBlocks: false
+FixNamespaceComments: true
+ContinuationIndentWidth: 2
+BreakStringLiterals: true
+BreakInheritanceList: AfterColon
+BreakConstructorInitializers: AfterColon
+BreakBeforeTernaryOperators: true
+CommentPragmas:  '.* \\(param|tparam|brief|detail|details|return|returns|note|warning|todo)'
+# EmptyLineBeforeAccessModifier: LogicalBlock
+# IndentRequires: true
+# BreakBeforeConceptDeclarations: true
+IndentPPDirectives: BeforeHash
+...
