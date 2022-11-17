@@ -31,6 +31,14 @@ enum class bit_ops : unsigned char
 	LOGICAL	   = 1 << 3
 };
 
+enum unscoped_foo
+{
+	unscoped_bar,
+	unscoped_sin = unscoped_bar + 5,
+	unscoped_cos,
+	unscoped_tan
+};
+
 int main()
 {
 	/*constexpr auto foo_str		= strenum::stringify<foo>();
@@ -40,5 +48,6 @@ int main()
 	for(auto str : foo_str) std::cout << str << std::endl;*/
 
 	constexpr auto v = strenum::stringify<bit_ops, bit_ops::NONE, bit_ops::LOGICAL>();
+	constexpr auto c = strenum::stringify<unscoped_foo, unscoped_bar, unscoped_tan>();
 	return 1;
 }
