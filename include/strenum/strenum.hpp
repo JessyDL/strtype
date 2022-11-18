@@ -59,6 +59,7 @@ namespace strenum
 			constexpr operator char const*() const { return buf; }
 
 			constexpr auto size() const noexcept -> size_t { return N; }
+			constexpr auto empty() const noexcept -> bool { return size() == 0; }
 
 			template <size_t start, size_t end>
 			consteval auto substr() const noexcept -> fixed_string<end - start>
@@ -72,10 +73,46 @@ namespace strenum
 		fixed_string(char const (&)[N]) -> fixed_string<N - 1>;
 #pragma endregion fixed_string
 #pragma region helpers
-		consteval auto to_underlying(auto value) { return static_cast<std::underlying_type_t<decltype(value)>>(value); }
+		consteval auto to_underlying(auto value) { return static_cast<std::underlying_type_t<decltype(value)>>(value); }		
+
+		#if !defined(__cpp_lib_is_scoped_enum)
+		// taken from cppreference: https://en.cppreference.com/w/cpp/types/is_scoped_enum
+		namespace
+		{	 // avoid ODR-violation
+			template <class T>
+			auto test_sizable(int) -> decltype(sizeof(T), std::true_type {});
+			template <class>
+			auto test_sizable(...) -> std::false_type;
+
+			template <class T>
+			auto test_nonconvertible_to_int(int)
+			  -> decltype(static_cast<std::false_type (*)(int)>(nullptr)(std::declval<T>()));
+			template <class>
+			auto test_nonconvertible_to_int(...) -> std::true_type;
+
+			template <class T>
+			constexpr bool is_scoped_enum_impl =
+			  std::conjunction_v<decltype(test_sizable<T>(0)), decltype(test_nonconvertible_to_int<T>(0))>;
+		}	 // namespace
+
+		template <class>
+		struct is_scoped_enum : std::false_type
+		{};
+
+		template <class E>
+			requires std::is_enum_v<E>
+		struct is_scoped_enum<E> : std::bool_constant<is_scoped_enum_impl<E>>
+		{};
 
 		template <typename T>
-		concept IsValidStringifyableEnum = std::is_enum_v<T> && std::is_integral_v<std::underlying_type_t<T>>;
+		static constexpr auto is_scoped_enum_v = is_scoped_enum<T>::value;
+#else
+		template<typename T>
+		static constexpr auto is_scoped_enum_v = std::is_scoped_enum_v<T>;
+#endif
+
+		template <typename T>
+		concept IsValidStringifyableEnum = is_scoped_enum_v<T> && std::is_integral_v<std::underlying_type_t<T>>;
 
 		template <typename T>
 		concept EnumHasKnownBegin = requires() { T::_BEGIN; };
@@ -140,6 +177,62 @@ namespace strenum
 		static constexpr pattern PATTERN = pattern::UNKNOWN;
 	};
 
+	// returns the value of the given enum as a cross platform (MSVC, GCC, and CLang) consistent fixed_string
+	template <auto Value>
+		requires(details::is_scoped_enum_v<decltype(Value)>)
+	consteval auto stringify()
+	{
+		constexpr auto full_signature = details::fixed_string {STRENUM_SIG};
+
+		constexpr auto range = [&signature = full_signature]() -> std::pair<size_t, size_t> {
+			if(signature.size() == 0) return {};
+			size_t depth {0};
+#if defined(STRENUM_MSVC)
+			size_t end {0};
+			for(auto i = 0; i != signature.size(); ++i)
+			{
+				auto index = (signature.size() - 1) - i;
+				if(signature[index] == '>')
+				{
+					if(depth == 0)
+					{
+						end = index;
+					}
+					++depth;
+				}
+				else if(signature[index] == '<')
+				{
+					--depth;
+					if(depth == 0)
+					{
+						return {index + 1, end};
+					}
+				}
+				else if(index > 0 && depth == 1 && signature[index] == ':' && signature[index - 1] == ':')
+				{
+					return {index + 1, end};
+				}
+			}
+#elif defined(STRENUM_GNUG)
+			for(auto i = 0; i != signature.size(); ++i)
+			{
+				auto index = (signature.size() - 1) - i;
+				if(((index > 0 && signature[index] == ':' && signature[index - 1] == ':') ||
+					(index + 1 < signature.size() && signature[index] == ' ' && signature[index + 1] == '(')))
+				{
+					return {index + 1, signature.size() - 1};
+				}
+			}
+#endif
+			throw std::exception();	   // we couldn't find the start of the signature
+		}();
+		constexpr auto signature = full_signature.template substr<range.first, range.second>();
+		if constexpr(!signature.empty() && signature[0] != '(')
+			return signature;
+		else
+			return details::fixed_string {""};
+	}
+
 	namespace details
 	{
 		template <typename T>
@@ -158,66 +251,12 @@ namespace strenum
 			}
 		}
 
-
-		consteval bool is_named_value(const std::string_view value) { return value.size() > 0 && value.at(0) != '('; }
-		// returns the value of the given enum as a cross platform (MSVC, GCC, and CLang) consistent fixed_string
-		template <auto Value>
-		consteval auto get_enum_value_string()
-		{
-			constexpr auto full_signature = details::fixed_string {STRENUM_SIG};
-
-			constexpr auto range = [&signature = full_signature]() -> std::pair<size_t, size_t> {
-				if(signature.size() == 0) return {};
-				size_t depth {0};
-#if defined(STRENUM_MSVC)
-				size_t end {0};
-				for(auto i = 0; i != signature.size(); ++i)
-				{
-					auto index = (signature.size() - 1) - i;
-					if(signature[index] == '>')
-					{
-						if(depth == 0)
-						{
-							end = index;
-						}
-						++depth;
-					}
-					else if(signature[index] == '<')
-					{
-						--depth;
-						if(depth == 0)
-						{
-							return {index + 1, end};
-						}
-					}
-					else if(index > 0 && depth == 1 && signature[index] == ':' && signature[index - 1] == ':')
-					{
-						return {index + 1, end};
-					}
-				}
-#elif defined(STRENUM_GNUG)
-				for(auto i = 0; i != signature.size(); ++i)
-				{
-					auto index = (signature.size() - 1) - i;
-					if(((index > 0 && signature[index] == ':' && signature[index - 1] == ':') ||
-						(index + 1 < signature.size() && signature[index] == ' ' && signature[index + 1] == '(')))
-					{
-						return {index + 1, signature.size() - 1};
-					}
-				}
-#endif
-				throw std::exception();	   // we couldn't find the start of the signature
-			}();
-
-			return full_signature.template substr<range.first, range.second>();
-		}
-
 		template <typename T, pattern Pattern, std::underlying_type_t<T> Offset, std::underlying_type_t<T>... Indices>
 		consteval auto get_named_entries_count(std::integer_sequence<std::underlying_type_t<T>, Indices...>) -> size_t
 			requires(Pattern == pattern::SEQUENTIAL)
 		{
 			size_t count = 0;
-			([&count]() mutable { count += is_named_value(get_enum_value_string<T {Indices + Offset}>()); }(), ...);
+			([&count]() mutable { count += (!stringify<T {Indices + Offset}>().empty()); }(), ...);
 			return count;
 		}
 
@@ -236,8 +275,6 @@ namespace strenum
 
 			if constexpr(Pattern == pattern::SEQUENTIAL)
 			{
-				
-
 				return []<size_t Size, std::underlying_type_t<T> Offset, std::underlying_type_t<T>... Indices>(
 				  std::integer_sequence<std::underlying_type_t<T>, Indices...>)
 				{
@@ -247,8 +284,8 @@ namespace strenum
 					auto set_value = []<details::fixed_string Str>(size_t index, auto& buffer) { buffer[index] = Str; };
 					(
 					  [&index, &result, set_value]() mutable {
-						  constexpr auto name = get_enum_value_string<T {Indices + Offset}>();
-						  if(is_named_value(name))
+						  constexpr auto name = stringify<T {Indices + Offset}>();
+						  if(!name.empty())
 						  {
 							  set_value.template operator()<name>(index++, result);
 						  }
