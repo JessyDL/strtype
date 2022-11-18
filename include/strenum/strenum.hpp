@@ -19,14 +19,6 @@
 
 namespace strenum
 {
-	enum class pattern
-	{
-		UNKNOWN,	// will try to figure out if the type is sequential or bitflag, but it's best to set this manually
-		SEQUENTIAL,	   // do the enum values come sequentially? i.e. 0, 1, 2, 3, ..., 9, 10 .. (does not need to be
-					   // consecutive)
-		FLAG,		   // are the values more akin to bit flags? i.e. 1, 2, 4, 8, 16, ..., 512, 1024 ..
-	};
-
 	namespace details
 	{
 #pragma region fixed_string
@@ -73,9 +65,9 @@ namespace strenum
 		fixed_string(char const (&)[N]) -> fixed_string<N - 1>;
 #pragma endregion fixed_string
 #pragma region helpers
-		consteval auto to_underlying(auto value) { return static_cast<std::underlying_type_t<decltype(value)>>(value); }		
+		consteval auto to_underlying(auto value) { return static_cast<std::underlying_type_t<decltype(value)>>(value); }
 
-		#if !defined(__cpp_lib_is_scoped_enum)
+#if !defined(__cpp_lib_is_scoped_enum)
 		// taken from cppreference: https://en.cppreference.com/w/cpp/types/is_scoped_enum
 		namespace
 		{	 // avoid ODR-violation
@@ -107,7 +99,7 @@ namespace strenum
 		template <typename T>
 		static constexpr auto is_scoped_enum_v = is_scoped_enum<T>::value;
 #else
-		template<typename T>
+		template <typename T>
 		static constexpr auto is_scoped_enum_v = std::is_scoped_enum_v<T>;
 #endif
 
@@ -168,13 +160,82 @@ namespace strenum
 			else
 				return Value;
 		}
+
+		template <auto Offset, auto... Indices>
+		consteval auto make_offset_sequence_impl(std::integer_sequence<decltype(Offset), Indices...>)
+		{
+			return std::integer_sequence<decltype(Offset), Indices + Offset...> {};
+		}
+
+		template <auto Begin, auto End>
+		consteval auto make_offset_sequence()
+		{
+			constexpr auto MAXSIZE = End - Begin;
+			return make_offset_sequence_impl<Begin>(std::make_integer_sequence<decltype(Begin), MAXSIZE>());
+		}
+
+		enum class dummy
+		{
+		};
+
+		template <typename T>
+		struct is_array : std::false_type
+		{};
+
+		template <size_t S>
+		struct is_array<std::array<std::string_view, S>> : std::true_type
+		{};
 #pragma endregion helpers
 	}	 // namespace details
+
+	struct sequential_searcher
+	{
+		template <typename T, auto Begin, auto End>
+		consteval auto operator()() const noexcept
+		{
+			return
+			  []<std::underlying_type_t<T>... Indices>(std::integer_sequence<std::underlying_type_t<T>, Indices...>)
+			{
+				constexpr auto size = []() {
+					size_t count = 0;
+					([&count]() mutable { count += (!stringify<T {Indices}>().empty()); }(), ...);
+					return count;
+				}();
+
+				return []<size_t Size>() {
+					size_t index = 0;
+					std::array<std::string_view, Size> result {};
+					// workaround for MSVC related ICE
+					// todo report the ICE, and verify for fix later
+					auto set_value = []<details::fixed_string Str>(size_t index, auto& buffer) { buffer[index] = Str; };
+
+					// this one is a workaround for a compilation error where it believes this lambda has already been
+					// declared in MSVC todo figure out minimal repro and report
+					auto fn = [&index, &set_value, &result]<auto Indice>() mutable
+					{
+						constexpr auto name = stringify<T {Indice}>();
+						if constexpr(!name.empty())
+						{
+							set_value.template operator()<name>(index++, result);
+						}
+					};
+
+					(fn.template operator()<Indices>(), ...);
+
+					return result;
+				}.template operator()<size>();
+			}
+			(details::make_offset_sequence<Begin, End>());
+		}
+	};
+
+	struct bitflag_searcher
+	{};
 
 	template <details::IsValidStringifyableEnum T>
 	struct enum_information : public details::enum_start_t<T>, details::enum_end_t<T>
 	{
-		static constexpr pattern PATTERN = pattern::UNKNOWN;
+		using SEARCHER = sequential_searcher;
 	};
 
 	// returns the value of the given enum as a cross platform (MSVC, GCC, and CLang) consistent fixed_string
@@ -251,18 +312,8 @@ namespace strenum
 			}
 		}
 
-		template <typename T, pattern Pattern, std::underlying_type_t<T> Offset, std::underlying_type_t<T>... Indices>
-		consteval auto get_named_entries_count(std::integer_sequence<std::underlying_type_t<T>, Indices...>) -> size_t
-			requires(Pattern == pattern::SEQUENTIAL)
-		{
-			size_t count = 0;
-			([&count]() mutable { count += (!stringify<T {Indices + Offset}>().empty()); }(), ...);
-			return count;
-		}
-
-		template <typename T, auto Begin, auto End, pattern Pattern>
+		template <typename T, auto Begin, auto End, typename Searcher>
 		consteval auto get_unique_entries()
-			requires(Pattern != pattern::UNKNOWN)
 		{
 			constexpr auto MAXSIZE = End - Begin;
 			static_assert(
@@ -270,51 +321,22 @@ namespace strenum
 			  "Up the max search size for this enum. Either prefferably by specializing the 'enum_information<T>' and "
 			  "setting MAX_SEARCH_SIZE higher, or by upping the define (which would globally increase it)");
 
-			constexpr auto size = get_named_entries_count<T, Pattern, Begin>(
-			  std::make_integer_sequence<std::underlying_type_t<T>, MAXSIZE>());
-
-			if constexpr(Pattern == pattern::SEQUENTIAL)
-			{
-				return []<size_t Size, std::underlying_type_t<T> Offset, std::underlying_type_t<T>... Indices>(
-				  std::integer_sequence<std::underlying_type_t<T>, Indices...>)
-				{
-					size_t index = 0;
-					std::array<std::string_view, Size> result;
-
-					auto set_value = []<details::fixed_string Str>(size_t index, auto& buffer) { buffer[index] = Str; };
-					(
-					  [&index, &result, set_value]() mutable {
-						  constexpr auto name = stringify<T {Indices + Offset}>();
-						  if(!name.empty())
-						  {
-							  set_value.template operator()<name>(index++, result);
-						  }
-					  }(),
-					  ...);
-					return result;
-				}
-				.template operator()<size, Begin>(std::make_integer_sequence<std::underlying_type_t<T>, MAXSIZE>());
-			}
-		}
-
-		template <typename T, auto Begin, auto End, pattern Pattern>
-		consteval auto get_unique_entries()
-			requires(Pattern == pattern::UNKNOWN)
-		{
-			return get_unique_entries<T, Begin, End, pattern::SEQUENTIAL>();
+			constexpr auto result = Searcher {}.template operator()<T, Begin, End>();
+			static_assert(details::is_array<std::remove_cvref_t<decltype(result)>>::value, "the result type should be of `std::array<std::string_view, SIZE>` from the searcher.");
+			return result;
 		}
 	}	 // namespace details
 
 	template <details::IsValidStringifyableEnum T,
-			  auto Begin	  = enum_information<T>::BEGIN,
-			  auto End		  = enum_information<T>::END,
-			  pattern Pattern = enum_information<T>::PATTERN>
+			  auto Begin		= enum_information<T>::BEGIN,
+			  auto End			= enum_information<T>::END,
+			  typename Searcher = enum_information<T>::SEARCHER>
 	consteval auto stringify()
 	{
 		constexpr auto begin = details::guarantee_is_underlying_value<T, Begin>();
 		constexpr auto end	 = details::guarantee_is_underlying_value<T, End, true>();
 		static_assert(begin < end, "The end value should be larger than begin");
-		return details::get_unique_entries<T, begin, end, Pattern>();
+		return details::get_unique_entries<T, begin, end, Searcher>();
 	}
 }	 // namespace strenum
 
