@@ -38,6 +38,7 @@ namespace strenum
 		template <size_t N>
 		struct fixed_string
 		{
+			static constexpr auto SIZE = N;
 			char buf[N + 1] {};
 			consteval fixed_string(char const* s)
 			{
@@ -188,104 +189,131 @@ namespace strenum
 #pragma endregion helpers
 	}	 // namespace details
 
+	namespace details
+	{
+		template <auto Value>
+		consteval auto get_signature()
+		{
+			return details::fixed_string {STRENUM_SIG};
+		}
+		template <auto KnownValue>
+		consteval auto get_known_offset() -> size_t
+		{
+			constexpr auto Str = get_signature<KnownValue>();
+			if(Str.size() == 0) throw std::exception();
+			size_t depth {0};
+#if defined(STRENUM_MSVC)
+			for(auto i = 5; i < Str.size(); ++i)
+			{
+				auto index = (Str.size() - 1) - i;
+				if(Str[index] == '>')
+				{
+					++depth;
+				}
+				else if(Str[index] == '<')
+				{
+					--depth;
+					if(depth == 0)
+					{
+						throw std::exception();	   // not possible; should always be enum_class::value
+					}
+				}
+				else if(index > 0 && depth == 1 && Str[index] == ':' && Str[index - 1] == ':')
+				{
+					return index + 1;
+				}
+				else if(Str[index] == ')')
+				{
+					throw std::exception();
+				}
+			}
+#elif defined(STRENUM_GNUG)
+			for(auto i = 0; i != Str.size(); ++i)
+			{
+				auto index = (Str.size() - 1) - i;
+				if(index > 0 && Str[index] == ':' && Str[index - 1] == ':')
+				{
+					return index + 1;
+				}
+				else if(index + 1 < Str.size() && Str[index] == ' ' && Str[index + 1] == '(')
+				{
+					throw std::exception();
+				}
+			}
+#endif
+			throw std::exception();	   // we couldn't find the start of the signature
+		}
+
+		template <auto Value, size_t known_offset>
+			requires(details::is_scoped_enum_v<decltype(Value)>)
+		consteval auto stringify_value_impl()
+		{
+			constexpr auto full_signature = details::get_signature<Value>();
+#if defined(STRENUM_MSVC)
+			constexpr auto end_offset = 7;	  // sizeof(">(void)")
+#elif defined(STRENUM_GNUG)
+			constexpr auto end_offset = 1;	  // sizeof("]")
+#endif
+
+			if constexpr(full_signature.size() <= known_offset)
+			{
+				return details::fixed_string {""};
+			}
+			else
+			{
+				if constexpr(full_signature[known_offset - 1] == ':')
+				{
+					return full_signature.template substr<known_offset, full_signature.size() - end_offset>();
+				}
+				else
+				{
+					return details::fixed_string {""};
+				}
+			}
+		}
+	}	 // namespace details
+
 	// returns the value of the given enum as a cross platform (MSVC, GCC, and CLang) consistent fixed_string
 	template <auto Value>
 		requires(details::is_scoped_enum_v<decltype(Value)>)
 	consteval auto stringify()
 	{
-		constexpr auto full_signature = details::fixed_string {STRENUM_SIG};
-
-		constexpr auto range = [&signature = full_signature]() -> std::pair<size_t, size_t> {
-			if(signature.size() == 0) return {};
-			size_t depth {0};
-#if defined(STRENUM_MSVC)
-			size_t end {0};
-			for(auto i = 0; i != signature.size(); ++i)
-			{
-				auto index = (signature.size() - 1) - i;
-				if(signature[index] == '>')
-				{
-					if(depth == 0)
-					{
-						end = index;
-					}
-					++depth;
-				}
-				else if(signature[index] == '<')
-				{
-					--depth;
-					if(depth == 0)
-					{
-						return {index + 1, end};
-					}
-				}
-				else if(index > 0 && depth == 1 && signature[index] == ':' && signature[index - 1] == ':')
-				{
-					return {index + 1, end};
-				}
-			}
-#elif defined(STRENUM_GNUG)
-			for(auto i = 0; i != signature.size(); ++i)
-			{
-				auto index = (signature.size() - 1) - i;
-				if(((index > 0 && signature[index] == ':' && signature[index - 1] == ':') ||
-					(index + 1 < signature.size() && signature[index] == ' ' && signature[index + 1] == '(')))
-				{
-					return {index + 1, signature.size() - 1};
-				}
-			}
-#endif
-			throw std::exception();	   // we couldn't find the start of the signature
-		}();
-		constexpr auto signature = full_signature.template substr<range.first, range.second>();
-		if constexpr(!signature.empty() && signature[0] != '(')
-			return signature;
-		else
-			return details::fixed_string {""};
+		return details::stringify_value_impl<Value, details::get_known_offset<Value>()>();
 	}
-
 
 	struct sequential_searcher
 	{
-		template <typename T, auto Begin, auto End>
+		template <typename T, auto Begin, auto End, auto GetEnumName>
 		consteval auto operator()() const noexcept
 		{
-			return
-			  []<std::underlying_type_t<T>... Indices>(std::integer_sequence<std::underlying_type_t<T>, Indices...>)
+			return []<std::underlying_type_t<T>... Indices>(
+			  std::integer_sequence<std::underlying_type_t<T>, Indices...>)
 			{
-				constexpr auto size = []() {
+				constexpr auto fn = [](std::string_view* buffer = nullptr) {
 					size_t count = 0;
-					(
-					  [&count]() mutable {
-						  constexpr auto enum_value {T {Indices}};
-						  count += (!(stringify<enum_value>().empty()));
-					  }(),
-					  ...);
-					return count;
-				}();
 
-				return []<size_t Size>() {
-					size_t index = 0;
-					std::array<std::string_view, Size> result {};
 					// workaround for MSVC related ICE
 					// todo report the ICE, and verify for fix later
 					auto set_value = []<details::fixed_string Str>(size_t index, auto& buffer) { buffer[index] = Str; };
 
-					// this one is a workaround for a compilation error where it believes this lambda has already been
-					// declared in MSVC todo figure out minimal repro and report
-					auto fn = [&index, &set_value, &result]<auto Indice>() mutable
-					{
-						constexpr auto name = stringify<T {Indice}>();
-						if constexpr(!name.empty())
-						{
-							set_value.template operator()<name>(index++, result);
-						}
-					};
+					(
+					  [&count, &set_value, &buffer]() mutable {
+						  constexpr auto enum_value {T {Indices}};
+						  constexpr auto name = GetEnumName.template operator()<enum_value>();
+						  if(!name.empty())
+						  {
+							  if(buffer) set_value.template operator()<name>(count, buffer);
+							  ++count;
+						  }
+					  }(),
+					  ...);
+					return count;
+				};
+				constexpr auto size = fn();
 
-					(fn.template operator()<Indices>(), ...);
-
-					return result;
-				}.template operator()<size>();
+				std::array<std::string_view, size> result {};
+				fn(result.data());
+				return result;
 			}
 			(details::make_offset_sequence<Begin, End>());
 		}
@@ -318,7 +346,7 @@ namespace strenum
 			}
 		}
 
-		template <typename T, auto Begin, auto End, typename Searcher>
+		template <typename T, auto Begin, auto End, typename Searcher, size_t KnownOffset>
 		consteval auto get_unique_entries()
 		{
 			constexpr auto MAXSIZE = End - Begin;
@@ -327,8 +355,11 @@ namespace strenum
 			  "Up the max search size for this enum. Either prefferably by specializing the 'enum_information<T>' and "
 			  "setting MAX_SEARCH_SIZE higher, or by upping the define (which would globally increase it)");
 
-			constexpr auto result = Searcher {}.template operator()<T, Begin, End>();
-			static_assert(details::is_array<std::remove_cvref_t<decltype(result)>>::value, "the result type should be of `std::array<std::string_view, SIZE>` from the searcher.");
+			constexpr auto result = Searcher {}.template operator()<T, Begin, End, []<T value>() {
+				return details::stringify_value_impl<value, KnownOffset>();
+			}>();
+			static_assert(details::is_array<std::remove_cvref_t<decltype(result)>>::value,
+						  "the result type should be of `std::array<std::string_view, SIZE>` from the searcher.");
 			return result;
 		}
 	}	 // namespace details
@@ -342,7 +373,7 @@ namespace strenum
 		constexpr auto begin = details::guarantee_is_underlying_value<T, Begin>();
 		constexpr auto end	 = details::guarantee_is_underlying_value<T, End, true>();
 		static_assert(begin < end, "The end value should be larger than begin");
-		return details::get_unique_entries<T, begin, end, Searcher>();
+		return details::get_unique_entries<T, begin, end, Searcher, details::get_known_offset<T {Begin}>()>();
 	}
 }	 // namespace strenum
 

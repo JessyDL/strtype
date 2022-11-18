@@ -36,7 +36,7 @@ Lastly the search pattern. There are 2 provided search patterns `strenum::sequen
 You can provide your own searcher, as long as it satisfies the following API:
 ```cpp
 struct custom_searcher {
-  template<typename T, auto Begin, auto End>
+  template<typename T, auto Begin, auto End, auto GetEnumName /* optimized version of stringifying enums*/>
   consteval auto operator() const noexcept -> std::array<std::string_view, /* size must be calculated internally */>
 };
 ```
