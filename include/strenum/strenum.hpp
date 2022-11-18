@@ -367,7 +367,7 @@ namespace strenum
 	template <details::IsValidStringifyableEnum T,
 			  auto Begin		= enum_information<T>::BEGIN,
 			  auto End			= enum_information<T>::END,
-			  typename Searcher = enum_information<T>::SEARCHER>
+			  typename Searcher = typename enum_information<T>::SEARCHER>
 	consteval auto stringify()
 	{
 		constexpr auto begin = details::guarantee_is_underlying_value<T, Begin>();
