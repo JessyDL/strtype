@@ -1,0 +1,31 @@
+name: ubuntu
+
+on: [push]
+    
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - CC: gcc-11
+            CXX: g++-11
+          - CC: clang-14
+            CXX: clang++-14
+    env:
+      CC: ${{ matrix.CC }}
+      CXX: ${{ matrix.CXX }}
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        submodules: recursive
+    - name: initialize
+      run: cmake -G "Unix Makefiles" .
+    - name: compile
+      run: cmake --build . 
+    - name: test
+      run: |
+            cd tests
+            ctest .
