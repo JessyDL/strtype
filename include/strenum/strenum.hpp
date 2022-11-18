@@ -188,56 +188,6 @@ namespace strenum
 #pragma endregion helpers
 	}	 // namespace details
 
-	struct sequential_searcher
-	{
-		template <typename T, auto Begin, auto End>
-		consteval auto operator()() const noexcept
-		{
-			return
-			  []<std::underlying_type_t<T>... Indices>(std::integer_sequence<std::underlying_type_t<T>, Indices...>)
-			{
-				constexpr auto size = []() {
-					size_t count = 0;
-					([&count]() mutable { count += (!stringify<T {Indices}>().empty()); }(), ...);
-					return count;
-				}();
-
-				return []<size_t Size>() {
-					size_t index = 0;
-					std::array<std::string_view, Size> result {};
-					// workaround for MSVC related ICE
-					// todo report the ICE, and verify for fix later
-					auto set_value = []<details::fixed_string Str>(size_t index, auto& buffer) { buffer[index] = Str; };
-
-					// this one is a workaround for a compilation error where it believes this lambda has already been
-					// declared in MSVC todo figure out minimal repro and report
-					auto fn = [&index, &set_value, &result]<auto Indice>() mutable
-					{
-						constexpr auto name = stringify<T {Indice}>();
-						if constexpr(!name.empty())
-						{
-							set_value.template operator()<name>(index++, result);
-						}
-					};
-
-					(fn.template operator()<Indices>(), ...);
-
-					return result;
-				}.template operator()<size>();
-			}
-			(details::make_offset_sequence<Begin, End>());
-		}
-	};
-
-	struct bitflag_searcher
-	{};
-
-	template <details::IsValidStringifyableEnum T>
-	struct enum_information : public details::enum_start_t<T>, details::enum_end_t<T>
-	{
-		using SEARCHER = sequential_searcher;
-	};
-
 	// returns the value of the given enum as a cross platform (MSVC, GCC, and CLang) consistent fixed_string
 	template <auto Value>
 		requires(details::is_scoped_enum_v<decltype(Value)>)
@@ -293,6 +243,62 @@ namespace strenum
 		else
 			return details::fixed_string {""};
 	}
+
+
+	struct sequential_searcher
+	{
+		template <typename T, auto Begin, auto End>
+		consteval auto operator()() const noexcept
+		{
+			return
+			  []<std::underlying_type_t<T>... Indices>(std::integer_sequence<std::underlying_type_t<T>, Indices...>)
+			{
+				constexpr auto size = []() {
+					size_t count = 0;
+					(
+					  [&count]() mutable {
+						  constexpr auto enum_value {T {Indices}};
+						  count += (!(stringify<enum_value>().empty()));
+					  }(),
+					  ...);
+					return count;
+				}();
+
+				return []<size_t Size>() {
+					size_t index = 0;
+					std::array<std::string_view, Size> result {};
+					// workaround for MSVC related ICE
+					// todo report the ICE, and verify for fix later
+					auto set_value = []<details::fixed_string Str>(size_t index, auto& buffer) { buffer[index] = Str; };
+
+					// this one is a workaround for a compilation error where it believes this lambda has already been
+					// declared in MSVC todo figure out minimal repro and report
+					auto fn = [&index, &set_value, &result]<auto Indice>() mutable
+					{
+						constexpr auto name = stringify<T {Indice}>();
+						if constexpr(!name.empty())
+						{
+							set_value.template operator()<name>(index++, result);
+						}
+					};
+
+					(fn.template operator()<Indices>(), ...);
+
+					return result;
+				}.template operator()<size>();
+			}
+			(details::make_offset_sequence<Begin, End>());
+		}
+	};
+
+	struct bitflag_searcher
+	{};
+
+	template <details::IsValidStringifyableEnum T>
+	struct enum_information : public details::enum_start_t<T>, details::enum_end_t<T>
+	{
+		using SEARCHER = sequential_searcher;
+	};
 
 	namespace details
 	{
