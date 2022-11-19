@@ -281,41 +281,98 @@ namespace strenum
 		return details::stringify_value_impl<Value, details::get_known_offset<Value>()>();
 	}
 
+	namespace details
+	{
+		template <typename... Ts>
+		struct get_array_pack_size
+		{};
+
+		template <typename T, size_t S, typename... Res>
+		struct get_array_pack_size<std::array<T, S>, Res...>
+		{
+			static constexpr auto value = []() {
+				if constexpr(sizeof...(Res) > 0)
+				{
+					return S + get_array_pack_size<Res...>::value;
+				}
+				else
+				{
+					return S;
+				}
+			}();
+		};
+	}	 // namespace details
+
 	struct sequential_searcher
 	{
 		template <typename T, auto Begin, auto End, auto GetEnumName>
 		consteval auto operator()() const noexcept
 		{
-			return []<std::underlying_type_t<T>... Indices>(
-			  std::integer_sequence<std::underlying_type_t<T>, Indices...>)
-			{
-				constexpr auto fn = [](std::string_view* buffer = nullptr) {
-					size_t count = 0;
+			using underlying_t = std::underlying_type_t<T>;
+			// we need this workaround for CLang which has a hard limit of 256 expansions for fold expressions
+			constexpr underlying_t PACK_SIZE  = 128;
+			constexpr underlying_t remainder  = (End - Begin) % PACK_SIZE;
+			constexpr underlying_t iterations = (End - Begin - remainder) / PACK_SIZE;
 
-					// workaround for MSVC related ICE
-					// todo report the ICE, and verify for fix later
-					auto set_value = []<details::fixed_string Str>(size_t index, auto& buffer) { buffer[index] = Str; };
+			auto fn = []<underlying_t Offset, underlying_t Count>() {
+				auto internal =
+				  []<std::underlying_type_t<T>... Indices>(std::integer_sequence<std::underlying_type_t<T>, Indices...>)
+				{
+					auto fn = [](std::string_view* buffer = nullptr) {
+						size_t count = 0;
 
-					(
-					  [&count, &set_value, &buffer]() mutable {
-						  constexpr auto enum_value {T {Indices}};
-						  constexpr auto name = GetEnumName.template operator()<enum_value>();
-						  if(!name.empty())
-						  {
-							  if(buffer) set_value.template operator()<name>(count, buffer);
-							  ++count;
-						  }
-					  }(),
-					  ...);
-					return count;
+						// workaround for MSVC related ICE
+						// todo report the ICE, and verify for fix later
+						auto set_value = []<details::fixed_string Str>(size_t index, auto& buffer) {
+							buffer[index] = Str;
+						};
+
+						auto iterator_fn =
+						  []<auto Index>(auto& set_value, auto& count, std::string_view* buffer)
+						{
+							constexpr auto enum_value {T {Index}};
+							constexpr auto name = GetEnumName.template operator()<enum_value>();
+							if(!name.empty())
+							{
+								if(buffer) set_value.template operator()<name>(count, buffer);
+								++count;
+							}
+						};
+
+						(iterator_fn.template operator()<Indices>(set_value, count, buffer), ...);
+						return count;
+					};
+					constexpr auto size = fn();
+
+					std::array<std::string_view, size> result {};
+					fn(result.data());
+					return result;
 				};
-				constexpr auto size = fn();
 
-				std::array<std::string_view, size> result {};
-				fn(result.data());
-				return result;
-			}
-			(details::make_offset_sequence<Begin, End>());
+				return internal(details::make_offset_sequence<Offset, Offset + Count>());
+			};
+
+			auto fn_iters =
+			  [&fn]<std::underlying_type_t<T>... Indices>(std::integer_sequence<std::underlying_type_t<T>, Indices...>)
+			{
+				auto make_array = []<typename... Ts>(Ts&&... arrays) {
+					constexpr auto total_size = details::get_array_pack_size<Ts...>::value;
+					std::array<std::string_view, total_size> res {};
+					size_t offset {0};
+					auto fill = [](auto& dst, const auto& src, size_t& offset) {
+						for(const auto& v : src)
+						{
+							dst[offset++] = v;
+						}
+					};
+					(fill(res, arrays, offset), ...);
+					return res;
+				};
+
+				return make_array(fn.template operator()<Begin + (Indices * PACK_SIZE), PACK_SIZE>()...,
+								  fn.template operator()<Begin + (iterations * PACK_SIZE), remainder>());
+			};
+			return fn_iters(std::make_integer_sequence<std::underlying_type_t<T>, iterations>());
 		}
 	};
 
