@@ -23,7 +23,7 @@ enum class foo {
 The output will be an array of `{ "bar", "cos", "sin" }`, notice the missing `"tan"` (see this [on godbolt](https://godbolt.org/#z:OYLghAFBqd5QCxAYwPYBMCmBRdBLAF1QCcAaPECAMzwBtMA7AQwFtMQByARg9KtQYEAysib0QXACx8BBAKoBnTAAUAHpwAMvAFYTStJg1DIApACYAQuYukl9ZATwDKjdAGFUtAK4sGIAMzSrgAyeAyYAHI%2BAEaYxCBm0gAOqAqETgwe3r4ByanpAqHhUSyx8Ym2mPaOAkIETMQEWT5%2BgZXVGXUNBEWRMXEJ0gr1jc05bcPdvSVlgwCUtqhexMjsHOb%2BYcjeWADU5mYIBARJCiAA9OfETADuAHTAhAhe0V5KK7KMBHdoLOcAUpgFAoAJ4AEWC52GxEYPnOWAAbuctjtMFCCDCGHDobCWHcEEkkgcTBoAIIk8lmTYMbZePYmfxuZDDfCoBnYCkU3G7bZMYG7fiofYAdisZN2Et20QapApkt29QY%2B38YKlMrlkrQCll4slaQYOvJwrBDLF5LJzDYCiSTFWuxxWJYIrNEoImBYSQMboZbnZGuhXgcu1xAH0wvxiCwmDUGD7BeznRqJW8wsBdkJsKSAEpuAAS2CzytVDp8IBASgAjl4vngxCGlA1kAg4qak/b6o5kDyBMNMKoksRdkwvERdhZsABxACSEXlEpMooFqFQZelg4XJv8Lr1HbwXbQDF7/cHw9H2Aiqrn88XgrL%2BpFm%2B3Esu7eje%2B7h7dx/teAAXpgQwIXYAFlSQADRDDNszzSCpwALWwZ1djMDRJAADgfU1dhfVAkhjMRaBBXZUAROJiDwPYCGbe1MEbBAf3/UgFQQPAFF2ViGDADggPCTAsHQXYvAYeh%2BRBJZdhYoCqMwXZaDwFhCDuDUN1bMkVLUskwiAqMwggOZE11A8jwHIcRyFBExGrNiGWLDFcTvDFUzwKgQTjZd2T01TSQlCMICMoDTzZMwADZ20HEBdgs7wgX0hcnx3dAywHLSqAgYkzAAVgUEwMrcWMzDMJjoTudBoyYPS5i868TV1GECGWJUNC8jcOAWWhOAy3g/A4LRSBXDhfUsax7SWFYZI2HhSAITRWoWABrBJhTuNCzAATjQyQzC4fwMtW1bgq4Lh9E4SQupmvrOF4M4NCmmaFjgWAYEQFBUA9Og4nIShfiSd74mABRmFOBBUAIUhET3TAADU8EwG4AHkkkYThJpoWg3WIM4IGic7ojCBoQWR3hfjYQQ4eEgmet4LAoyMcRKbBvAYQcPBSLOem%2B0wZARzWSatKqc65Oia5iBBDwsEJqbyJYQmFioAx/uh2GEaR7heH4QQRDEdguEK9X5CUNRzt0I6DCMFBrGsfQ8GiM5IAWXCYzZgBaFkbNMIbLBQ3Ynbh/wrqqTmYxcBh3E8Fo9BCMI%2BlKAYjpSNIYzGPw4/yGNpn6eIjrsQPOhGJow5yLOA%2BZ2o8/TmPM9sPOk70SZGnL2YuAWBRRtWCQ2o6s76f63ZVDQ4KneCyRdmAZAuwgDEhLm/SIFwQgSH2Kkm94abKbmBZmyYLB4j00gFq4DLloOgrMskDQCuFSR9uOjhTtIaXgrMO4uA0Q7guFfwD64YUMqO7rev6ldEAN1V5aHuk9CASAOZcyIGQCgEAGj/WUIYKoQhgY3G6pNb6dA3wCGQeEWgaDUAYPOtg%2Bgf0AZMCBiDUgZC4hwxHEQkhqtSDQNJMQf6l1WGqE5nUfA3U1ayE1uIKQMhBCKBUOoemuh/D6EMMYC2lgrY23gPbPCGRnauxVO7Kwnteot2WG3LOBB%2BH4NQegzBK8YQ814Dca4SQZY306qQf%2BvB%2BrYB4TAhefcB5DxHmPXYE9iBTxnoNXRNhdhz1gYvT%2BcwV53Q3rRbelAO6314NLfwS00LrTQv4EKG0VpXxcedQBthgG3TXvNQYdxVpmA2v4fwGhH6JAaYVdqHA/bFO7lw0BrVSAPSgBApAdC4FfVej9chKBTbAEAsEhgc0waYARBDRW8NEaWL4HQdGmNsb01xswEWEtiZfDJoRc61N5F016vgJmjhWbnWgdzCWfN2m9UFsLUWGAbGS3ko4uWTAFYwzWSrFGQjRAiN1rICRhtpEBDkWbHRltBa213g7DRnAXYmLdooiwXsfadOziXPwEBXA1yOpHYoGc9DxwKJkAuydSA0rTlHGYsd2g51Lt0Ml7KiVdHriyqlxiuX0trmXAVFd26LEMdrVJzjXEXQ4L3fug9h68iMIEye8yZ5RIXhNOJFSwGJK3gMXeC1JD%2BDuBlSQOsMpWtWhlJpa1hQ3zvg/J%2BL834fy/j/P%2BJSuHXQNX0gZkCQCPNgZ9BBHCFBmMIRYo54ycExhjUw%2BVIypnyNmVPWhCbyEMOEHGlhbCo1cOgXwsIXC9bCO1tIPW0KpG9WNvChRHsbDItUX1dRPYMVaLBIivRV1W7ayrqYlBsbiEbLst8uxVDHHtLlX6jgHjOZmUHD4lVPJpkarmdPQJYTLaRPwNEvV8TKmkE3sk3e7TXUBCyTkvJwUCmJFWl0gB/rym9PXnvBIT8HVWsypk4UZhhRoQyv4NCN9OnytKR%2B/pEChkvTeuQiNaaETIEJCGBEXBVohi9ECAgIZVBD0Wcs1YqzlYbNRtsyguzer7PxvGlgJMCCnIptc90ly1jXMZjne57NPFPJYS8gW1sPli041Y35qtZbywUGR9ZEtK3gurWI/WkijYgGkNM82LblEorUY7Tg6JEp9txRobCcMzDYTBBebAFg5ATmwnBPA2EJxEXOBOAAYuZ5QAAVEAU43BefOHDXzIAszYCC2jZAwB/YdGcCSkO3KKXR0boy1OGRuVMoyA3NlhKYx8vztkBleXc5THFaluuhXw5Cv5ZSiVTcpVjUlXOrur7FWEeHiwBQqHIpYbuLh4YgSdXriXvqj9VSGl3AadNmbs2XXpJAI/Z%2Br8uDv0/r/H1L63FvpAXdWD8AQ1hpIBGxB0bR0poYxM3BDBk0Ft6ihtDSQMNYZw9GPDBGiMjLzRdwtnj2GcI4LwUtJjy2A5U1WiQNaoUG3rToBITbtPhN0%2B2tFXaOBGcR9YFCA7pWipHQQn7k1J0S2nQ4qTTjWvbcXfx6JHXdhdZ65h1a/W3uDYgHupRB754jdiSew183743uWne/J6En1bYVUA3bp6FqJDuB/R%2Be1NqSDF6hDKEHKeS8DZ%2B9pZhNfQYSaQUiGMMgaaAA%3D)). This is because during compilation `foo::tan` is considered an alias of `foo::bar`, and will be substituted. There is no way of recovering this information.
 
 ## Usage & customization points
-The only two points you need to interact with is the `strenum::stringify<YOUR_ENUM_TYPE>()` and the specializable `strenum::enum_information`. The first is an `immediate function` that will return you an array of all uniquely named enum values if given an enum type, or if given an enum value will stringify that; while the latter is a customization point (see example section).
+The most important points you need to interact with is `strenum::stringify<YOUR_ENUM_TYPE>()`, `strenum::stringify_map<YOUR_ENUM_TYPE>()`, and the specializable `strenum::enum_information`. The first two are `immediate function`s that will return you an array or string dependant on if you pass it an enum or an enum value. The `stringify_map` will return a compile time and runtime searchable map that can convert enum values into their string based representation and vice-verse. While `strenum::enum_information` is a customization point (see example section).
 
 If you can't add the `_BEGIN`/`_END` values to the enum, or prefer not to, you can specialize `strenum::enum_information` for your enum class. Note that if you specialize, and set the `END` value in `strenum::enum_information` to be an instance of your enum type, it will be an *inclusive range*, unlike normal ranges, otherwise it will be exclusive range. This is the mathematical difference of `[0,10]` (range of 0 to 10, inclusive) and `[0,10)` (a range of 0 to 9, excluding 10).
 
@@ -48,7 +48,7 @@ See `strenum::sequential_searcher`, or `strenum::bitflag_searcher` for example i
 Following example showcases an enum being stringified, and accessible as a contiguous array of `std::string_view`'s.
 ```cpp
 enum class foo {
-    bar, tan, cos, sin,
+  bar, tan, cos, sin,
 };
 
 namespace strenum {
@@ -77,9 +77,33 @@ enum class foo {
 };
 
 int main() {
-   // note: the return type of foobar_str is a type containing the string as NTTP argument.
+  // note: the return type of foobar_str is a type containing the string as NTTP argument.
   constexpr auto foobar_str = strenum::stringify<foo::bar>();
   static_assert(foobar_str == std::string_view { "bar" });
+  return 0;
+}
+```
+
+### runtime stringify enum values ([godbolt](https://godbolt.org/#z:OYLghAFBqd5QCxAYwPYBMCmBRdBLAF1QCcAaPECAMzwBtMA7AQwFtMQByARg9KtQYEAysib0QXACx8BBAKoBnTAAUAHpwAMvAFYTStJg1DIApACYAQuYukl9ZATwDKjdAGFUtAK4sGe1wAyeAyYAHI%2BAEaYxHoADqgKhE4MHt6%2BcQlJAkEh4SxRMVy2mPaOAkIETMQEqT5%2BRXaYDskVVQQ5YZHRegqV1bXpDX3twZ353VwAlLaoXsTI7BzmAMzByN5YANTmZggEBLEKIAD0x8RMAO4AdMCECF4RXkrzsowEV2gsxwBSmAoKAE8ACIBY69YiMHzHLAAN2Oaw2mDBBAhDCh4MhLCuCFisR2Jg0AEECcSzKsGOsvFsTMs3OcGOhUCwadgSSsEVTMNtachevhUCySZjNusmP9NvxUNsAOxWImbTYRKqkTaVBgqtAKFWJdWbAD6FmwAHEAJKhblAxXK/XYUKWmmWnWkNnSoE0uXEoloBi9TCqWLETZMLxECWoVB6lhMWIWzYYtEsEAgcHBW5UAGR6M0tySlkQSbutlE4IETZR4L5mUehV8pP0xksPWwvALTbEdCF%2BVxgjoJMsAhcACcg%2BW0rLBAg7fzBeW1e7vZAVXOAOzkpVkhZYYjMLEXj%2BJllkqTSrIW6TapVR5QCUv4aTOplbtnJJrPaTXgYeH4xEbJabeBTR4ygYbNEgAL0wPUCE3YgGQgDRb23Xc/iucDMErABaTYpk7QkFW/CBg1DPBYw0d1NhI7NNmWMxyOsaw8ALLsDznV8FwDEsqAgfEzAAVgUExeLcECzDMRDMzxXiLElPUd28fcpNg9AIH7AteLddSrnQJhKmnXCFQPN0uwhAg5gYTYyOfIlDI4aZaE4XjeD8DgtFIVBODcejLDjWZ5i5FYeFIAhNFs6YAGsQDMaUrgADjMQcYskMwuGWXjhwANi4Ip7I4SQnJCtzOF4I4EOClzbNIOBYBgRBrxYWI6GichKE%2BBr6BiYAFGYQ4EFQAhSGbBYADU8EwC4AHlYkYThApoWgCGiI4IAiAqImCKoARm3hPjYQRxoYWhNvKgbMCjIxxGO/AIWaGE/gKv0mhDRZApLEoCtoPAInOYgAQ8LAtqC4g8ETbgKqoAxOpGsbJum0GZEEEQxHYLgxP4QRFBUdRjt0bLDGMLybA%2BiIjkgaZUFiYCjg4DC%2BQdUxLGsMwNE2DDxuWYqSiaYCXAZAZ6lIQJRjyAoMkSYC%2BdFrIGA6YWJmKUoWmGCWGk55pymGGWukKWwlc8Ooeg1oWtYkaYFF8hYTf0Bz8uO9yOE2VQYvSjD0skTZgGQZBNggFEPzCyZvdwQgSG2Mkpl4MqtEmaYEEwJgsBifNSAirheNizLRL4yQNFE6VJEHdKrdy3hE3Sswri4DQsvS6VllTrhpV4opnNcu3ipAUqQumKraoe5AQxIZrCOITrlEMEohF6i5nMC1q6B05Ix5CWhJ9QaeCrn9qQE67qFF6/rN%2BicaQ1X9fjr7wkR6p3g%2B4qfBnN4NHhFEcQpHh%2BQlDUArdGWfQ8ZQAm%2BhPokyTuTSmnAaY9jpgTJmxVzbIx1vfJeE8p4zwjhCZ6vALjnFiFtOy1tSAt14HbbAqhHpEEDI7Z2rt3ae29r7Bg/tvaeQZpYFUQcKGhzrpMCOXcY5xwTpQfBxdSCJlHLFBKMUaLpUSnFfOhCCpt1sB3IKfDk6RUkFcQcZhErLGWBoMuZhJB6LEjldmCjbZFVUeVbuNUe4QCQIfMgFAIBOJQAYIwUFiB%2BxOjCFsmAoYTSmmgvgdAFrECWitY6a1mA/QBjtN4%2B1DoFSwGdYAF1XJXS5ngW6VNXJ9yegDV6OVXJE2%2Br9DAmDAbAzwXwCGChAkwxCU/RGr9UayAxl/bGIBf4ePxqwwmwD4BkwpskKmkCOzLCBPTKwlgmYszZhzBWzgICuGVgLBkmtxja3iGLZI6zdlSy2SLFWyyGCtH6HrQY8tsnqzaMcuWvQ2jrKedUB5hRTbwMtjlRyFjW6cAdk7F2btRRGHod4xhAcIAcJDgFHh1io78Pjt0JOEVjFXF4pIFGvFMWDl4gY%2BK0oi55VESAMuFcq5cBrnXJujdm6KKsSVBFFV7FIAKRQoeVRR7jxXqg%2BJTI2oLwEMg3la8iGkDcaC4AXifFOOPsIPlcML5XysbfHswQrEtJfsjaQT9OlY1cjjP%2BRgAEDKAcTYZblRkCHGbTKZMzGauTNnMC2QwkE8tPiElEmAqnYOjLUn5Nt/kcFIeQkOVDgUij6eCv2UKWGzJsJsGFgY4W8JsUiwRSccokrEdFGKkjpGyKMYOP5xDGUqMjqFdRokMUaExXxUc0oooxV4ssGKRdzHiqUZW2x8BWV1Tak1FxbiYTIFxLJIceoDALV6HqVQrtfH%2BMacEgGc1wmRNWutOJcMEl7QOkdTJp08YZN4Fkm6d1z5kP7gtIpgg3rHTKRtP6ixXIohqaDaY4MmCQ1GkE2Gs1ZCtJ1e/fV38QDSD6aahN5qQEjPARwZEvYHVzOZsccaZhNjHCBHabAFg5BGkwwALRIscI0AJMNGgAGKYfGsoAAKiAE0bhqNofoyAAAStgFj81kDACWbcvwqzeZXP5oLXIxsiiHPFiJyWwF3k9FVsBC5NQZOnIE8p%2BTQxnmqZ1vco22zLbOr8t8ghXaAXzrdiwBQo7NgwiHFcadfxSzQvwJw1NzLo7qL0VcPRvm/P%2BeJSXMl5dK7V1rvXOlpbCocHbp3GxlU7FsqvQPZxlAuUKBFZ6/l9V57AUy4q1yI6x2xAnYOKdOknNzoXXKk%2BirArKs6qqq9d8NUxffkBiQuqOmfwNToSKxr%2BnQaJrBq18HENQcdXAl1CC%2BTBHy2KgG3rfU4IDaZhlIbkucIs2WazXs7ODgcxV3ozDAFJtc7CsO8Ke3CJzT0vNBazAyMkHIktZm2tMuu9WzRtcy7DiSpIZ7TNJC8Q7UGstbXPs5TMGD6LabEWkFuhE5I4GgA%3D%3D%3D))
+The following example stores the values into a compile, or runtime searchable map. We then use (randomly) get the string based representation using the enum value. The reverse is also possible (string search to enum value).
+```cpp
+#include <random>
+#include <cstdio>
+enum class foo {
+  bar, tan, cos, sin, _BEGIN = bar, _END = sin,
+};
+
+constexpr auto foo_map = strenum::stringify_map<foo>();
+
+int main() {
+  std::random_device rd;
+  std::mt19937 mt(rd());
+  std::array<foo, 4> foo_values{foo::bar, foo::tan, foo::cos, foo::sin };
+  std::uniform_int_distribution<size_t> rnd(0, foo_values.size() - 1);
+  for(auto i = 0; i < 32; ++i)
+  {
+    std::printf("%s\n", foo_map[foo_values[rnd(mt)]].data());
+  }
   return 0;
 }
 ```

@@ -61,10 +61,10 @@ TEST_CASE("basic enum with specialization and hole")
 
 enum class unreasonably_large : std::int64_t
 {
-	first = -2000,
+	first	   = -2000,
 	some_other = -51,
-	then_more = 20,
-	and_more = 2000,
+	then_more  = 20,
+	and_more   = 2000,
 };
 
 namespace strenum
@@ -72,9 +72,9 @@ namespace strenum
 	template <>
 	struct enum_information<unreasonably_large>
 	{
-		using SEARCHER				= strenum::sequential_searcher;
-		static constexpr auto BEGIN = unreasonably_large::first;
-		static constexpr auto END	= unreasonably_large::and_more;
+		using SEARCHER							= strenum::sequential_searcher;
+		static constexpr auto BEGIN				= unreasonably_large::first;
+		static constexpr auto END				= unreasonably_large::and_more;
 		static constexpr size_t MAX_SEARCH_SIZE = 8000;
 	};
 }	 // namespace strenum
@@ -105,9 +105,9 @@ namespace strenum
 	template <>
 	struct enum_information<bit_ops>
 	{
-		using SEARCHER							= strenum::sequential_searcher;
-		static constexpr auto BEGIN				= bit_ops::NONE;
-		static constexpr auto END				= bit_ops::LOGICAL;
+		using SEARCHER				= strenum::sequential_searcher;
+		static constexpr auto BEGIN = bit_ops::NONE;
+		static constexpr auto END	= bit_ops::LOGICAL;
 	};
 }	 // namespace strenum
 
@@ -133,3 +133,18 @@ enum unscoped_foo
 };
 
 TEST_CASE("unscoped enum should be rejected") { STATIC_REQUIRE(!strenum::details::is_scoped_enum_v<unscoped_foo>); }
+
+
+TEST_CASE("compile_time lookup")
+{
+	constexpr auto map	= strenum::stringify_map<bit_ops>();
+	STATIC_REQUIRE(map[bit_ops::LOGICAL] == "LOGICAL");
+	STATIC_REQUIRE(map["LOGICAL"] == bit_ops::LOGICAL);
+}
+
+TEST_CASE("runtime lookup")
+{
+	constexpr auto map = strenum::stringify_map<bit_ops>();
+	REQUIRE(map[bit_ops::LOGICAL] == "LOGICAL");
+	REQUIRE(map["LOGICAL"] == bit_ops::LOGICAL);
+}
