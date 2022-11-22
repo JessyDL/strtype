@@ -340,7 +340,10 @@ namespace strenum
 			constexpr auto end() const noexcept { return std::end(m_Data); }
 			constexpr auto cend() const noexcept { return std::cend(m_Data); }
 
-			constexpr auto string_at_index(size_t i) const noexcept -> const std::string_view& { return m_Data[i].string; }
+			constexpr auto string_at_index(size_t i) const noexcept -> const std::string_view&
+			{
+				return m_Data[i].string;
+			}
 			constexpr auto value_at_index(size_t i) const noexcept -> const T& { return m_Data[i].value; }
 
 		  private:
@@ -491,15 +494,15 @@ namespace strenum
 
 			// Iterates over all Indices and returns all valid enum values as a
 			// `std::pair<std::array<std::string_view>, std::array<T>>`
-			auto get_all_valid_enum_values =
-			  []<std::underlying_type_t<T>... Indices>(std::integer_sequence<std::underlying_type_t<T>, Indices...>)
+			constexpr auto get_all_valid_enum_values = []<std::underlying_type_t<T>... Indices>(
+			  std::integer_sequence<std::underlying_type_t<T>, Indices...>) constexpr
 			{
-				auto get_and_fill_valid_enum_values = [](std::string_view* str_buffer = nullptr,
-														 T* value_buffer			  = nullptr) {
+				constexpr auto get_and_fill_valid_enum_values = [](std::string_view* str_buffer = nullptr,
+																   T* value_buffer				= nullptr) constexpr {
 					size_t count = 0;
 
-					auto get_and_fill_valid_enum_value =
-					  []<auto Index>(auto& count, std::string_view* str_buffer, T* value_buffer)
+					constexpr auto get_and_fill_valid_enum_value =
+					  []<auto Index>(auto& count, std::string_view* str_buffer, T* value_buffer) constexpr
 					{
 						constexpr auto enum_value {T {Index}};
 						constexpr auto name = GetEnumName.template operator()<enum_value>();
@@ -511,7 +514,7 @@ namespace strenum
 
 								// workaround for MSVC related ICE
 								// todo report the ICE, and verify for fix later
-								[]<details::fixed_string Str>(size_t index, auto& str_buffer) {
+								[]<details::fixed_string Str>(size_t index, auto& str_buffer) constexpr {
 									str_buffer[index] = Str;
 								}.template operator()<name>(count, str_buffer);
 							}
@@ -530,21 +533,22 @@ namespace strenum
 				return std::pair {str_result, val_result};
 			};
 
-			auto split_into_iteration_packs_and_invoke = []<std::underlying_type_t<T>... Indices>(
-			  auto& get_all_valid_enum_values, std::integer_sequence<std::underlying_type_t<T>, Indices...>)
+			constexpr auto split_into_iteration_packs_and_invoke = []<std::underlying_type_t<T>... Indices>(
+			  auto& get_all_valid_enum_values, std::integer_sequence<std::underlying_type_t<T>, Indices...>) constexpr
 			{
-				auto merge_results = []<typename... Ts>(Ts&&... arrays) {
+				constexpr auto merge_results = []<typename... Ts>(Ts&&... arrays) constexpr {
 					constexpr auto total_size = details::get_array_pack_size<Ts...>::value;
 					std::array<std::string_view, total_size> res_string {};
 					std::array<T, total_size> res_values {};
 					size_t offset {0};
-					auto fill = [](auto& dst_str, auto& dst_values, const auto& src, size_t& offset) {
-						for(size_t i = 0; i < src.first.size(); ++offset, ++i)
-						{
-							dst_str[offset]	   = src.first[i];
-							dst_values[offset] = src.second[i];
-						}
-					};
+					constexpr auto fill =
+					  [](auto& dst_str, auto& dst_values, const auto& src, size_t& offset) constexpr {
+						  for(size_t i = 0; i < src.first.size(); ++offset, ++i)
+						  {
+							  dst_str[offset]	 = src.first[i];
+							  dst_values[offset] = src.second[i];
+						  }
+					  };
 					(fill(res_string, res_values, arrays, offset), ...);
 					return std::pair {res_string, res_values};
 				};
@@ -581,7 +585,7 @@ namespace strenum
 
 			// prepares an std::index_sequence<> where the indices are every bit value with added 0. I.e. it's a range
 			// that looks like: { 0, 1, 2, 4, 8, 16, 32, ..., 1 << (sizeof(underlying_t) * 8) }
-			constexpr auto bit_shift_indices = []<size_t... Indices>(std::index_sequence<Indices...>)
+			constexpr auto bit_shift_indices = []<size_t... Indices>(std::index_sequence<Indices...>) constexpr
 			{
 				return std::index_sequence<0, size_t {1} << Indices...> {};
 			}
@@ -597,8 +601,8 @@ namespace strenum
 									 T* value_buffer			  = nullptr) constexpr
 			{
 				size_t count {0};
-				auto get_and_fill_if_valid =
-				  []<auto Index>(auto& count, std::string_view* str_buffer = nullptr, T* value_buffer = nullptr)
+				constexpr auto get_and_fill_if_valid = []<auto Index>(
+				  auto& count, std::string_view* str_buffer = nullptr, T* value_buffer = nullptr) constexpr
 				{
 					constexpr auto enum_value {T {static_cast<std::underlying_type_t<T>>(Index)}};
 					constexpr auto name = GetEnumName.template operator()<enum_value>();
@@ -610,7 +614,7 @@ namespace strenum
 
 							// workaround for MSVC related ICE
 							// todo report the ICE, and verify for fix later
-							[]<details::fixed_string Str>(size_t index, auto& str_buffer) {
+							[]<details::fixed_string Str>(size_t index, auto& str_buffer) constexpr {
 								str_buffer[index] = Str;
 							}.template operator()<name>(count, str_buffer);
 						}
