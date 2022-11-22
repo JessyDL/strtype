@@ -247,28 +247,21 @@ namespace strenum
 			return fnv1a_32(to_byte_array<T>(value));
 		}
 
-		template <typename T>
-		struct ct_bst_value_t
-		{
-			std::string_view string;
-			T value;
-		};
-
 		template <typename T, size_t Size>
 		struct ct_bst
 		{
 		  public:
 			using string_hash_pair_t = std::pair<std::uint32_t, size_t>;				// hash + index
 			using value_hash_pair_t	 = std::pair<std::underlying_type_t<T>, size_t>;	// hash + index
-			using value_pair_t		 = ct_bst_value_t<T>;
+			using value_pair_t		 = std::pair<std::string_view, T>;
 			consteval ct_bst(const auto& strs, const auto& values)
 			{
 				// iterate over all values, turn them into hashed values, and then sort them based on hashes.
 				for(size_t i = 0; i < values.size(); ++i)
 				{
 					m_Data[i]		= value_pair_t {strs[i], values[i]};
-					m_StringHash[i] = string_hash_pair_t {fnv1a_32(m_Data[i].string), i};
-					m_ValueHash[i]	= value_hash_pair_t {to_underlying<T>(m_Data[i].value), i};
+					m_StringHash[i] = string_hash_pair_t {fnv1a_32(m_Data[i].first), i};
+					m_ValueHash[i]	= value_hash_pair_t {to_underlying<T>(m_Data[i].second), i};
 				}
 				std::sort(std::begin(m_StringHash), std::end(m_StringHash), [](const auto& lhs, const auto& rhs) {
 					return lhs.first < rhs.first;
@@ -303,8 +296,8 @@ namespace strenum
 										   std::end(m_StringHash),
 										   [hash = fnv1a_32(value)](const auto& value) { return hash == value.first; });
 
-					if(it != std::end(m_StringHash) && m_Data[it->second].string == value)
-						return m_Data[it->second].value;
+					if(it != std::end(m_StringHash) && m_Data[it->second].first == value)
+						return m_Data[it->second].second;
 				}
 				else
 				{
@@ -316,7 +309,7 @@ namespace strenum
 
 					for(auto it = begin; it != end; it = std::next(it))
 					{
-						if(m_Data[it->second].string == value) return m_Data[it->second].value;
+						if(m_Data[it->second].first == value) return m_Data[it->second].second;
 					}
 				}
 				throw std::exception(/* missing value */);
@@ -329,7 +322,7 @@ namespace strenum
 							   std::end(m_ValueHash),
 							   [hash = to_underlying<T>(value)](const auto& value) { return hash == value.first; });
 
-				if(it != std::end(m_ValueHash) && m_Data[it->second].value == value) return m_Data[it->second].string;
+				if(it != std::end(m_ValueHash) && m_Data[it->second].second == value) return m_Data[it->second].first;
 
 				throw std::exception(/* missing value */);
 			}
@@ -342,9 +335,9 @@ namespace strenum
 
 			constexpr auto string_at_index(size_t i) const noexcept -> const std::string_view&
 			{
-				return m_Data[i].string;
+				return m_Data[i].first;
 			}
-			constexpr auto value_at_index(size_t i) const noexcept -> const T& { return m_Data[i].value; }
+			constexpr auto value_at_index(size_t i) const noexcept -> const T& { return m_Data[i].second; }
 
 		  private:
 			std::array<string_hash_pair_t, Size> m_StringHash {};
@@ -440,12 +433,25 @@ namespace strenum
 		}
 	}	 // namespace details
 
+	struct sequential_searcher;
+
+	/// \brief Customization point for enum types
+	/// \details Here you can add a customization for your specific enum type, set its `BEGIN` and `END`, as well as custom searcher, or search depth overrides.
+	/// \tparam T A valid stringifyable enum type (a scoped enum that satisfies std::is_integral)
+	template <details::IsValidStringifyableEnum T>
+	struct enum_information : public details::enum_start_t<T>, details::enum_end_t<T>
+	{
+		using SEARCHER = sequential_searcher;
+	};
+
 	// returns the value of the given enum as a cross platform (MSVC, GCC, and CLang) consistent fixed_string
 	template <auto Value>
 		requires(details::is_scoped_enum_v<decltype(Value)>)
 	consteval auto stringify()
 	{
-		return details::stringify_value_impl<Value, details::get_known_offset<Value>()>();
+		return details::stringify_value_impl<
+		  Value,
+		  details::get_known_offset<decltype(Value) {enum_information<decltype(Value)>::BEGIN}>()>();
 	}
 
 	namespace details
@@ -474,7 +480,54 @@ namespace strenum
 		{};
 	}	 // namespace details
 
+	/// \brief iterates over the indices, and fills in the values as needed.
+	/// \returns an std::pair<std::array<std::string_view>, std::array<T>>. The arrays are 1-1 mapped (i.e. the indices point to the same enum value, just different representation)
+	/// \note this function is solely provided to make implementing custom *_searcher types easier.
+	template <typename T, typename sequence_type, auto... Indices>
+	constexpr auto stringify(std::integer_sequence<sequence_type, Indices...>)
+	{
+		constexpr auto get_and_fill_valid_enum_values = [](std::string_view* str_buffer = nullptr,
+														   T* value_buffer				= nullptr) constexpr {
+			size_t count = 0;
+
+			constexpr auto get_and_fill_valid_enum_value =
+			  []<auto Index>(auto& count, std::string_view* str_buffer, T* value_buffer) constexpr
+			{
+				constexpr auto get_enum_name = []<T value>() constexpr {
+					return details::stringify_value_impl<value,
+														 details::get_known_offset<T {enum_information<T>::BEGIN}>()>();
+				};
+
+				constexpr auto enum_value {T {static_cast<std::underlying_type_t<T>>(Index)}};
+				constexpr auto name = get_enum_name.template operator()<enum_value>();
+				if(!name.empty())
+				{
+					if(str_buffer)
+					{
+						value_buffer[count] = enum_value;
+						// workaround for MSVC related ICE
+						// todo report the ICE, and verify for fix later
+						[]<details::fixed_string Str>(size_t index, auto& str_buffer) constexpr {
+							str_buffer[index] = Str;
+						}.template operator()<name>(count, str_buffer);
+					}
+					++count;
+				}
+			};
+
+			(get_and_fill_valid_enum_value.template operator()<Indices>(count, str_buffer, value_buffer), ...);
+			return count;
+		};
+		constexpr auto size = get_and_fill_valid_enum_values();
+
+		std::array<std::string_view, size> str_result {};
+		std::array<T, size> val_result {};
+		get_and_fill_valid_enum_values(str_result.data(), val_result.data());
+		return std::pair {str_result, val_result};
+	}
+
 	/// \brief Sequentially searches from [Begin, End) for valid enum values
+	/// \note this can be quite compile time intensive O(max_size()), and comes with an extra limitation for CLang if the fold expression exceeds 256 values. An additional indirection was added to relax this, but do keep it in mind. See the searchers for example usage.
 	struct sequential_searcher
 	{
 		template <typename T, auto Begin, auto End>
@@ -483,7 +536,7 @@ namespace strenum
 			return End - Begin;
 		}
 
-		template <typename T, auto Begin, auto End, auto GetEnumName>
+		template <typename T, auto Begin, auto End>
 		consteval auto operator()() const noexcept
 		{
 			using underlying_t = std::underlying_type_t<T>;
@@ -492,49 +545,8 @@ namespace strenum
 			constexpr underlying_t remainder  = (End - Begin) % PACK_SIZE;
 			constexpr underlying_t iterations = (End - Begin - remainder) / PACK_SIZE;
 
-			// Iterates over all Indices and returns all valid enum values as a
-			// `std::pair<std::array<std::string_view>, std::array<T>>`
-			constexpr auto get_all_valid_enum_values = []<std::underlying_type_t<T>... Indices>(
-			  std::integer_sequence<std::underlying_type_t<T>, Indices...>) constexpr
-			{
-				constexpr auto get_and_fill_valid_enum_values = [](std::string_view* str_buffer = nullptr,
-																   T* value_buffer				= nullptr) constexpr {
-					size_t count = 0;
-
-					constexpr auto get_and_fill_valid_enum_value =
-					  []<auto Index>(auto& count, std::string_view* str_buffer, T* value_buffer) constexpr
-					{
-						constexpr auto enum_value {T {Index}};
-						constexpr auto name = GetEnumName.template operator()<enum_value>();
-						if(!name.empty())
-						{
-							if(str_buffer)
-							{
-								value_buffer[count] = enum_value;
-
-								// workaround for MSVC related ICE
-								// todo report the ICE, and verify for fix later
-								[]<details::fixed_string Str>(size_t index, auto& str_buffer) constexpr {
-									str_buffer[index] = Str;
-								}.template operator()<name>(count, str_buffer);
-							}
-							++count;
-						}
-					};
-
-					(get_and_fill_valid_enum_value.template operator()<Indices>(count, str_buffer, value_buffer), ...);
-					return count;
-				};
-				constexpr auto size = get_and_fill_valid_enum_values();
-
-				std::array<std::string_view, size> str_result {};
-				std::array<T, size> val_result {};
-				get_and_fill_valid_enum_values(str_result.data(), val_result.data());
-				return std::pair {str_result, val_result};
-			};
-
 			constexpr auto split_into_iteration_packs_and_invoke = []<std::underlying_type_t<T>... Indices>(
-			  auto& get_all_valid_enum_values, std::integer_sequence<std::underlying_type_t<T>, Indices...>) constexpr
+			  std::integer_sequence<std::underlying_type_t<T>, Indices...>) constexpr
 			{
 				constexpr auto merge_results = []<typename... Ts>(Ts&&... arrays) constexpr {
 					constexpr auto total_size = details::get_array_pack_size<Ts...>::value;
@@ -554,19 +566,20 @@ namespace strenum
 				};
 
 				// returns all valid enum values for the given range [Offset, Offset + Count) as a
-				return merge_results(
-				  get_all_valid_enum_values(details::make_offset_sequence<Begin + (Indices * PACK_SIZE),
-																		  PACK_SIZE,
-																		  std::underlying_type_t<T>>())...,
-				  get_all_valid_enum_values(details::make_offset_sequence<Begin + (iterations * PACK_SIZE),
-																		  remainder,
-																		  std::underlying_type_t<T>>()));
+				return merge_results(stringify<T>(details::make_offset_sequence<Begin + (Indices * PACK_SIZE),
+																				PACK_SIZE,
+																				std::underlying_type_t<T>>())...,
+									 stringify<T>(details::make_offset_sequence<Begin + (iterations * PACK_SIZE),
+																				remainder,
+																				std::underlying_type_t<T>>()));
 			};
 			return split_into_iteration_packs_and_invoke(
-			  get_all_valid_enum_values, std::make_integer_sequence<std::underlying_type_t<T>, iterations>());
+			  std::make_integer_sequence<std::underlying_type_t<T>, iterations>());
 		}
 	};
 
+	/// \brief searcher specialized for enums that are used as bitflags.
+	/// \note does not include combinatorial values (like 0x3, which would be bit flag 1 && 2). If that's needed, consider `strenum::sequential_searcher`
 	struct bitflag_searcher
 	{
 		template <typename T, auto Begin, auto End>
@@ -575,7 +588,7 @@ namespace strenum
 			return (sizeof(std::underlying_type_t<T>) * 8) + 1;
 		}
 
-		template <typename T, auto Begin, auto End, auto GetEnumName>
+		template <typename T, auto Begin, auto End>
 		consteval auto operator()() const noexcept
 		{
 			using underlying_t	= std::underlying_type_t<T>;
@@ -591,53 +604,8 @@ namespace strenum
 			}
 			(std::make_index_sequence<BITS>());
 
-			// iterates over the indices, and fills in the values as needed. This version is simplified version of the
-			// `sequential_searcher` due to never hitting the CLang fold limit.
-			// returns the count of the valid enums, and if the *_buffer values are set, it fills in those values in the
-			// buffer.
-			constexpr auto get_and_fill_valid_enum_values =
-			  []<index_t... Indices>(std::integer_sequence<index_t, Indices...>,
-									 std::string_view* str_buffer = nullptr,
-									 T* value_buffer			  = nullptr) constexpr
-			{
-				size_t count {0};
-				constexpr auto get_and_fill_if_valid = []<auto Index>(
-				  auto& count, std::string_view* str_buffer = nullptr, T* value_buffer = nullptr) constexpr
-				{
-					constexpr auto enum_value {T {static_cast<std::underlying_type_t<T>>(Index)}};
-					constexpr auto name = GetEnumName.template operator()<enum_value>();
-					if(!name.empty())
-					{
-						if(str_buffer)
-						{
-							value_buffer[count] = enum_value;
-
-							// workaround for MSVC related ICE
-							// todo report the ICE, and verify for fix later
-							[]<details::fixed_string Str>(size_t index, auto& str_buffer) constexpr {
-								str_buffer[index] = Str;
-							}.template operator()<name>(count, str_buffer);
-						}
-						++count;
-					}
-				};
-
-				(get_and_fill_if_valid.template operator()<Indices>(count, str_buffer, value_buffer), ...);
-				return count;
-			};
-
-			constexpr auto SIZE = get_and_fill_valid_enum_values(bit_shift_indices);
-			std::array<std::string_view, SIZE> str {};
-			std::array<T, SIZE> vals {};
-			get_and_fill_valid_enum_values(bit_shift_indices, str.data(), vals.data());
-			return std::pair {str, vals};
+			return stringify<T>(bit_shift_indices);
 		}
-	};
-
-	template <details::IsValidStringifyableEnum T>
-	struct enum_information : public details::enum_start_t<T>, details::enum_end_t<T>
-	{
-		using SEARCHER = sequential_searcher;
 	};
 
 	namespace details
@@ -667,9 +635,7 @@ namespace strenum
 			  "Up the max search size for this enum. Either prefferably by specializing the 'enum_information<T>' and "
 			  "setting MAX_SEARCH_SIZE higher, or by upping the define (which would globally increase it)");
 
-			constexpr auto result = Searcher {}.template operator()<T, Begin, End, []<T value>() {
-				return details::stringify_value_impl<value, KnownOffset>();
-			}>();
+			constexpr auto result = Searcher {}.template operator()<T, Begin, End>();
 			static_assert(IsRequiredReturnType<T, std::remove_cvref_t<decltype(result)>>,
 						  "the result type should be of `std::pair<std::array<std::string_view, SIZE>, std::array<T, "
 						  "SIZE>>` from the searcher.");
@@ -687,6 +653,12 @@ namespace strenum
 		}
 	}	 // namespace details
 
+	/// \brief Compile time stringify your enum type into an array from the range BEGIN to END
+	/// \tparam Searcher functional object that can iterate, and return the values (see `strenum::sequential_searcher` for example)
+	/// \tparam T enum type that satisfies the constraint
+	/// \tparam Begin start of the range (inclusive) to stringify
+	/// \tparam End end of the range (inclusive if decltype(End) == T, otherwise exclusive)
+	/// \returns an `std::array<std::string_view>` containing the ordered (by std::underlying_type_t<T>) string based representation values of the enum.
 	template <details::IsValidStringifyableEnum T,
 			  auto Begin		= enum_information<T>::BEGIN,
 			  auto End			= enum_information<T>::END,
@@ -699,6 +671,12 @@ namespace strenum
 		return details::get_unique_entries<T, begin, end, Searcher, details::get_known_offset<T {Begin}>()>();
 	}
 
+	/// \brief Compile time stringify your enum into an associative container from the range BEGIN to END
+	/// \tparam Searcher Searcher functional object that can iterate, and return the values (see `strenum::sequential_searcher` for example)
+	/// \tparam T enum type that satisfies the constraint
+	/// \tparam Begin start of the range (inclusive) to stringify
+	/// \tparam End end of the range (inclusive if decltype(End) == T, otherwise exclusive)
+	/// \returns an associative container where you can either iterate over the enum values as an std::pair<std::string_view, T>, or where you can use the bracker operator to efficiently convert string to T and vice-versa.
 	template <details::IsValidStringifyableEnum T,
 			  auto Begin		= enum_information<T>::BEGIN,
 			  auto End			= enum_information<T>::END,

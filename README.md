@@ -43,7 +43,7 @@ struct custom_searcher {
   template<typename T, auto Begin, auto End>
   consteval auto max_size() const noexcept -> size_t { /* return the theorethical max value for your enum type */ }
 
-  template<typename T, auto Begin, auto End, auto GetEnumName /* optimized version of stringifying enums*/>
+  template<typename T, auto Begin, auto End>
   consteval auto operator() const noexcept -> std::array<std::string_view, /* size must be calculated internally */>
 };
 ```
