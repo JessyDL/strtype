@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.19)
-set(STRENUM_TEST_PROJECT strenum_tests CACHE INTERNAL "")
-project(${STRENUM_TEST_PROJECT} VERSION 1.0.0 LANGUAGES CXX)
+set(STRTYPE_TEST_PROJECT strtype_tests CACHE INTERNAL "")
+project(${STRTYPE_TEST_PROJECT} VERSION 1.0.0 LANGUAGES CXX)
 
 include(FetchContent)
 
@@ -11,10 +11,10 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(catch2)
 
-add_executable(${STRENUM_TEST_PROJECT} tests.cpp)
-target_link_libraries(${STRENUM_TEST_PROJECT} PUBLIC strenum Catch2::Catch2WithMain)
+add_executable(${STRTYPE_TEST_PROJECT} tests.cpp)
+target_link_libraries(${STRTYPE_TEST_PROJECT} PUBLIC strtype Catch2::Catch2WithMain)
 
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 include(CTest)
 include(Catch)
-catch_discover_tests(${STRENUM_TEST_PROJECT})
+catch_discover_tests(${STRTYPE_TEST_PROJECT})

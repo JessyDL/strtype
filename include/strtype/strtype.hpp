@@ -6,20 +6,20 @@
 #include <type_traits>
 
 #if defined(_MSC_VER)
-	#define STRENUM_MSVC 1
-	#define STRENUM_SIG __FUNCSIG__
+	#define STRTYPE_MSVC 1
+	#define STRTYPE_SIG __FUNCSIG__
 #elif defined(__GNUG__)
-	#define STRENUM_GNUG 1
-	#define STRENUM_SIG __PRETTY_FUNCTION__
+	#define STRTYPE_GNUG 1
+	#define STRTYPE_SIG __PRETTY_FUNCTION__
 #else
 	#error Either __FUNCSIG__ (MSVC) or __PRETTY_FUNCTION__ (GCC/CLang) required
 #endif
 
-#if !defined(STRENUM_MAX_SEARCH_SIZE)
-	#define STRENUM_MAX_SEARCH_SIZE 1024
+#if !defined(STRTYPE_MAX_SEARCH_SIZE)
+	#define STRTYPE_MAX_SEARCH_SIZE 1024
 #endif
 
-namespace strenum
+namespace strtype
 {
 	namespace details
 	{
@@ -354,15 +354,73 @@ namespace strenum
 		template <auto Value>
 		consteval auto get_signature()
 		{
-			return details::fixed_string {STRENUM_SIG};
+			return details::fixed_string {STRTYPE_SIG};
 		}
+
+		template <typename T>
+		consteval auto get_signature()
+		{
+			return details::fixed_string {STRTYPE_SIG};
+		}
+
+		template <typename T>
+		consteval auto stringify_typename_offset()
+		{
+			constexpr auto Str = get_signature<T>();
+			if(Str.size() == 0) throw std::exception();
+			size_t depth {0};
+#if defined(STRTYPE_MSVC)
+			for(auto i = 5; i < Str.size(); ++i)
+			{
+				auto index = (Str.size() - 1) - i;
+				if(Str[index] == '>')
+				{
+					++depth;
+				}
+				else if(Str[index] == '<')
+				{
+					--depth;
+					if(depth == 0)
+					{
+						return index + 1;
+					}
+				}
+			}
+#elif defined(STRTYPE_GNUG)
+			for(auto i = 0; i != Str.size(); ++i)
+			{
+				auto index = (Str.size() - 1) - i;
+				if(Str[index] == '=')
+				{
+					return index + 2;
+				}
+			}
+#endif
+			throw std::exception();	   // we couldn't find the start of the signature
+		}
+
+		template <typename T, size_t KnownOffset>
+		consteval auto stringify_typename()
+		{
+			constexpr auto full_signature = details::get_signature<T>();
+			static_assert(full_signature.size() > KnownOffset);
+#if defined(STRTYPE_MSVC)
+			constexpr auto end_offset	= 7;	// sizeof(">(void)")
+			constexpr auto start_offset = full_signature[KnownOffset] == 's' ? 7 : 6;
+#elif defined(STRTYPE_GNUG)
+			constexpr auto end_offset	= 1;	// sizeof("]")
+			constexpr auto start_offset = 0;
+#endif
+			return full_signature.template substr<KnownOffset + start_offset, full_signature.size() - end_offset>();
+		}
+
 		template <auto KnownValue>
 		consteval auto get_known_offset() -> size_t
 		{
 			constexpr auto Str = get_signature<KnownValue>();
 			if(Str.size() == 0) throw std::exception();
 			size_t depth {0};
-#if defined(STRENUM_MSVC)
+#if defined(STRTYPE_MSVC)
 			for(auto i = 5; i < Str.size(); ++i)
 			{
 				auto index = (Str.size() - 1) - i;
@@ -387,7 +445,7 @@ namespace strenum
 					throw std::exception();
 				}
 			}
-#elif defined(STRENUM_GNUG)
+#elif defined(STRTYPE_GNUG)
 			for(auto i = 0; i != Str.size(); ++i)
 			{
 				auto index = (Str.size() - 1) - i;
@@ -409,9 +467,9 @@ namespace strenum
 		consteval auto stringify_value_impl()
 		{
 			constexpr auto full_signature = details::get_signature<Value>();
-#if defined(STRENUM_MSVC)
+#if defined(STRTYPE_MSVC)
 			constexpr auto end_offset = 7;	  // sizeof(">(void)")
-#elif defined(STRENUM_GNUG)
+#elif defined(STRTYPE_GNUG)
 			constexpr auto end_offset = 1;	  // sizeof("]")
 #endif
 
@@ -449,9 +507,7 @@ namespace strenum
 		requires(details::is_scoped_enum_v<decltype(Value)>)
 	consteval auto stringify()
 	{
-		return details::stringify_value_impl<
-		  Value,
-		  details::get_known_offset<decltype(Value) {enum_information<decltype(Value)>::BEGIN}>()>();
+		return details::stringify_value_impl<Value, details::get_known_offset<Value>()>();
 	}
 
 	namespace details
@@ -579,7 +635,7 @@ namespace strenum
 	};
 
 	/// \brief searcher specialized for enums that are used as bitflags.
-	/// \note does not include combinatorial values (like 0x3, which would be bit flag 1 && 2). If that's needed, consider `strenum::sequential_searcher`
+	/// \note does not include combinatorial values (like 0x3, which would be bit flag 1 && 2). If that's needed, consider `strtype::sequential_searcher`
 	struct bitflag_searcher
 	{
 		template <typename T, auto Begin, auto End>
@@ -622,7 +678,7 @@ namespace strenum
 			}
 			else
 			{
-				return STRENUM_MAX_SEARCH_SIZE;
+				return STRTYPE_MAX_SEARCH_SIZE;
 			}
 		}
 
@@ -654,7 +710,7 @@ namespace strenum
 	}	 // namespace details
 
 	/// \brief Compile time stringify your enum type into an array from the range BEGIN to END
-	/// \tparam Searcher functional object that can iterate, and return the values (see `strenum::sequential_searcher` for example)
+	/// \tparam Searcher functional object that can iterate, and return the values (see `strtype::sequential_searcher` for example)
 	/// \tparam T enum type that satisfies the constraint
 	/// \tparam Begin start of the range (inclusive) to stringify
 	/// \tparam End end of the range (inclusive if decltype(End) == T, otherwise exclusive)
@@ -672,7 +728,7 @@ namespace strenum
 	}
 
 	/// \brief Compile time stringify your enum into an associative container from the range BEGIN to END
-	/// \tparam Searcher Searcher functional object that can iterate, and return the values (see `strenum::sequential_searcher` for example)
+	/// \tparam Searcher Searcher functional object that can iterate, and return the values (see `strtype::sequential_searcher` for example)
 	/// \tparam T enum type that satisfies the constraint
 	/// \tparam Begin start of the range (inclusive) to stringify
 	/// \tparam End end of the range (inclusive if decltype(End) == T, otherwise exclusive)
@@ -690,8 +746,15 @@ namespace strenum
 		  details::get_unique_entries<T, begin, end, Searcher, details::get_known_offset<T {Begin}>(), false>();
 		return details::ct_bst<T, values_pair.first.size()>(values_pair.first, values_pair.second);
 	}
-}	 // namespace strenum
 
-#undef STRENUM_MSVC
-#undef STRENUM_GNUG
-#undef STRENUM_SIG
+	template <typename T>
+		requires(!details::IsValidStringifyableEnum<T>)
+	consteval auto stringify()
+	{
+		return details::stringify_typename<T, details::stringify_typename_offset<void>()>();
+	}
+}	 // namespace strtype
+
+#undef STRTYPE_MSVC
+#undef STRTYPE_GNUG
+#undef STRTYPE_SIG

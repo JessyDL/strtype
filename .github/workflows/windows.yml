@@ -11,7 +11,7 @@ jobs:
       with:
         submodules: recursive
     - name: initialize
-      run: cmake -G "Visual Studio 17 2022" .
+      run: cmake -G "Visual Studio 17 2022" . -DSTRTYPE_TESTS=ON
     - name: compile
       run: cmake --build . 
     - name: test
