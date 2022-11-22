@@ -258,16 +258,17 @@ namespace strenum
 		struct ct_bst
 		{
 		  public:
-			using hash_pair_t  = std::pair<std::uint32_t, size_t>;	  // hash + index
-			using value_pair_t = ct_bst_value_t<T>;
+			using string_hash_pair_t = std::pair<std::uint32_t, size_t>;				// hash + index
+			using value_hash_pair_t	 = std::pair<std::underlying_type_t<T>, size_t>;	// hash + index
+			using value_pair_t		 = ct_bst_value_t<T>;
 			consteval ct_bst(const auto& strs, const auto& values)
 			{
 				// iterate over all values, turn them into hashed values, and then sort them based on hashes.
 				for(size_t i = 0; i < values.size(); ++i)
 				{
 					m_Data[i]		= value_pair_t {strs[i], values[i]};
-					m_StringHash[i] = hash_pair_t {fnv1a_32(m_Data[i].string), i};
-					m_ValueHash[i]	= hash_pair_t {fnv1a_32(to_underlying<T>(m_Data[i].value)), i};
+					m_StringHash[i] = string_hash_pair_t {fnv1a_32(m_Data[i].string), i};
+					m_ValueHash[i]	= value_hash_pair_t {to_underlying<T>(m_Data[i].value), i};
 				}
 				std::sort(std::begin(m_StringHash), std::end(m_StringHash), [](const auto& lhs, const auto& rhs) {
 					return lhs.first < rhs.first;
@@ -275,36 +276,60 @@ namespace strenum
 				std::sort(std::begin(m_ValueHash), std::end(m_ValueHash), [](const auto& lhs, const auto& rhs) {
 					return lhs.first < rhs.first;
 				});
+
+				if(std::adjacent_find(
+					 std::begin(m_StringHash), std::end(m_StringHash), [](const auto& lhs, const auto& rhs) {
+						 return lhs.first == rhs.first;
+					 }) == std::end(m_StringHash))
+				{
+					m_PerfectHash = true;
+				}
+
+				if(std::adjacent_find(
+					 std::begin(m_ValueHash), std::end(m_ValueHash), [](const auto& lhs, const auto& rhs) {
+						 return lhs.first == rhs.first;
+					 }) != std::end(m_ValueHash))
+				{
+					throw std::exception();
+				}
 			}
 
 			constexpr auto operator[](std::string_view value) const -> T
 			{
-				const hash_pair_t hash {fnv1a_32(value), {}};
-				auto [begin, end] = std::equal_range(
-				  std::begin(m_StringHash), std::end(m_StringHash), hash, [](const auto& lhs, const auto& rhs) {
-					  return lhs.first < rhs.first;
-				  });
-
-				for(auto it = begin; it != end; it = std::next(it))
+				// todo: can turn this into a compile time constant
+				if(m_PerfectHash)
 				{
-					if(m_Data[it->second].string == value) return m_Data[it->second].value;
-				}
+					auto it = std::find_if(std::begin(m_StringHash),
+										   std::end(m_StringHash),
+										   [hash = fnv1a_32(value)](const auto& value) { return hash == value.first; });
 
+					if(it != std::end(m_StringHash) && m_Data[it->second].string == value)
+						return m_Data[it->second].value;
+				}
+				else
+				{
+					const string_hash_pair_t hash {fnv1a_32(value), {}};
+					auto [begin, end] = std::equal_range(
+					  std::begin(m_StringHash), std::end(m_StringHash), hash, [](const auto& lhs, const auto& rhs) {
+						  return lhs.first < rhs.first;
+					  });
+
+					for(auto it = begin; it != end; it = std::next(it))
+					{
+						if(m_Data[it->second].string == value) return m_Data[it->second].value;
+					}
+				}
 				throw std::exception(/* missing value */);
 			}
 
 			constexpr auto operator[](T value) const -> std::string_view
 			{
-				const hash_pair_t hash {fnv1a_32(to_underlying<T>(value)), {}};
-				auto [begin, end] = std::equal_range(
-				  std::begin(m_ValueHash), std::end(m_ValueHash), hash, [](const auto& lhs, const auto& rhs) {
-					  return lhs.first < rhs.first;
-				  });
+				auto it =
+				  std::find_if(std::begin(m_ValueHash),
+							   std::end(m_ValueHash),
+							   [hash = to_underlying<T>(value)](const auto& value) { return hash == value.first; });
 
-				for(auto it = begin; it != end; it = std::next(it))
-				{
-					if(m_Data[it->second].value == value) return m_Data[it->second].string;
-				}
+				if(it != std::end(m_ValueHash) && m_Data[it->second].value == value) return m_Data[it->second].string;
 
 				throw std::exception(/* missing value */);
 			}
@@ -315,10 +340,14 @@ namespace strenum
 			constexpr auto end() const noexcept { return std::end(m_Data); }
 			constexpr auto cend() const noexcept { return std::cend(m_Data); }
 
+			constexpr auto string_at_index(size_t i) const noexcept -> const std::string_view& { return m_Data[i].string; }
+			constexpr auto value_at_index(size_t i) const noexcept -> const T& { return m_Data[i].value; }
+
 		  private:
-			std::array<hash_pair_t, Size> m_StringHash {};
-			std::array<hash_pair_t, Size> m_ValueHash {};
+			std::array<string_hash_pair_t, Size> m_StringHash {};
+			std::array<value_hash_pair_t, Size> m_ValueHash {};
 			std::array<value_pair_t, Size> m_Data {};
+			bool m_PerfectHash {false};
 		};
 
 #pragma endregion compile_time_map
