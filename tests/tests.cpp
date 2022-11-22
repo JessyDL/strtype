@@ -91,13 +91,13 @@ TEST_CASE("large enum with extended search size")
 	STATIC_REQUIRE(correct_values[3] == values[3]);
 }
 
-enum class bit_ops : unsigned char
+enum class bit_ops : std::uint64_t
 {
 	NONE	   = 0,
 	BIT		   = 1 << 0,
 	SHIFT	   = 1 << 1,
 	ARITHMETIC = 1 << 2,
-	LOGICAL	   = 1 << 3
+	LOGICAL	   = std::uint64_t {1} << 63,
 };
 
 namespace strenum
@@ -105,7 +105,7 @@ namespace strenum
 	template <>
 	struct enum_information<bit_ops>
 	{
-		using SEARCHER				= strenum::sequential_searcher;
+		using SEARCHER				= strenum::bitflag_searcher;
 		static constexpr auto BEGIN = bit_ops::NONE;
 		static constexpr auto END	= bit_ops::LOGICAL;
 	};
@@ -137,7 +137,7 @@ TEST_CASE("unscoped enum should be rejected") { STATIC_REQUIRE(!strenum::details
 
 TEST_CASE("compile_time lookup")
 {
-	constexpr auto map	= strenum::stringify_map<bit_ops>();
+	constexpr auto map = strenum::stringify_map<bit_ops>();
 	STATIC_REQUIRE(map[bit_ops::LOGICAL] == "LOGICAL");
 	STATIC_REQUIRE(map["LOGICAL"] == bit_ops::LOGICAL);
 }

@@ -164,17 +164,16 @@ namespace strenum
 				return Value;
 		}
 
-		template <auto Offset, auto... Indices>
-		consteval auto make_offset_sequence_impl(std::integer_sequence<decltype(Offset), Indices...>)
+		template <auto Offset, typename T, auto... Indices>
+		consteval auto make_offset_sequence_impl(std::integer_sequence<T, Indices...>)
 		{
-			return std::integer_sequence<decltype(Offset), Indices + Offset...> {};
+			return std::integer_sequence<T, Indices + Offset...> {};
 		}
 
-		template <auto Begin, auto End>
+		template <auto Offset, auto Size, typename T = decltype(Offset)>
 		consteval auto make_offset_sequence()
 		{
-			constexpr auto MAXSIZE = End - Begin;
-			return make_offset_sequence_impl<Begin>(std::make_integer_sequence<decltype(Begin), MAXSIZE>());
+			return make_offset_sequence_impl<Offset>(std::make_integer_sequence<T, Size>());
 		}
 
 		enum class dummy
@@ -310,6 +309,12 @@ namespace strenum
 				throw std::exception(/* missing value */);
 			}
 
+			constexpr auto size() const noexcept -> size_t { return Size; }
+			constexpr auto begin() const noexcept { return std::begin(m_Data); }
+			constexpr auto cbegin() const noexcept { return std::begin(m_Data); }
+			constexpr auto end() const noexcept { return std::end(m_Data); }
+			constexpr auto cend() const noexcept { return std::cend(m_Data); }
+
 		  private:
 			std::array<hash_pair_t, Size> m_StringHash {};
 			std::array<hash_pair_t, Size> m_ValueHash {};
@@ -437,64 +442,69 @@ namespace strenum
 		{};
 	}	 // namespace details
 
+	/// \brief Sequentially searches from [Begin, End) for valid enum values
 	struct sequential_searcher
 	{
+		template <typename T, auto Begin, auto End>
+		consteval auto max_size() -> size_t
+		{
+			return End - Begin;
+		}
+
 		template <typename T, auto Begin, auto End, auto GetEnumName>
 		consteval auto operator()() const noexcept
 		{
 			using underlying_t = std::underlying_type_t<T>;
 			// we need this workaround for CLang which has a hard limit of 256 expansions for fold expressions
-			constexpr underlying_t PACK_SIZE  = 128;
+			constexpr underlying_t PACK_SIZE  = 255;
 			constexpr underlying_t remainder  = (End - Begin) % PACK_SIZE;
 			constexpr underlying_t iterations = (End - Begin - remainder) / PACK_SIZE;
 
-			auto fn = []<underlying_t Offset, underlying_t Count>() {
-				auto internal =
-				  []<std::underlying_type_t<T>... Indices>(std::integer_sequence<std::underlying_type_t<T>, Indices...>)
-				{
-					auto fn = [](std::string_view* str_buffer = nullptr, T* value_buffer = nullptr) {
-						size_t count = 0;
+			// Iterates over all Indices and returns all valid enum values as a
+			// `std::pair<std::array<std::string_view>, std::array<T>>`
+			auto get_all_valid_enum_values =
+			  []<std::underlying_type_t<T>... Indices>(std::integer_sequence<std::underlying_type_t<T>, Indices...>)
+			{
+				auto get_and_fill_valid_enum_values = [](std::string_view* str_buffer = nullptr,
+														 T* value_buffer			  = nullptr) {
+					size_t count = 0;
 
-						// workaround for MSVC related ICE
-						// todo report the ICE, and verify for fix later
-						auto set_value = []<details::fixed_string Str, auto EnumValue>(
-						  size_t index, auto& str_buffer, auto& val_buffer)
+					auto get_and_fill_valid_enum_value =
+					  []<auto Index>(auto& count, std::string_view* str_buffer, T* value_buffer)
+					{
+						constexpr auto enum_value {T {Index}};
+						constexpr auto name = GetEnumName.template operator()<enum_value>();
+						if(!name.empty())
 						{
-							str_buffer[index] = Str;
-							val_buffer[index] = EnumValue;
-						};
-
-						auto iterator_fn =
-						  []<auto Index>(auto& set_value, auto& count, std::string_view* str_buffer, T* value_buffer)
-						{
-							constexpr auto enum_value {T {Index}};
-							constexpr auto name = GetEnumName.template operator()<enum_value>();
-							if(!name.empty())
+							if(str_buffer)
 							{
-								if(str_buffer)
-									set_value.template operator()<name, enum_value>(count, str_buffer, value_buffer);
-								++count;
+								value_buffer[count] = enum_value;
+
+								// workaround for MSVC related ICE
+								// todo report the ICE, and verify for fix later
+								[]<details::fixed_string Str>(size_t index, auto& str_buffer) {
+									str_buffer[index] = Str;
+								}.template operator()<name>(count, str_buffer);
 							}
-						};
-
-						(iterator_fn.template operator()<Indices>(set_value, count, str_buffer, value_buffer), ...);
-						return count;
+							++count;
+						}
 					};
-					constexpr auto size = fn();
 
-					std::array<std::string_view, size> str_result {};
-					std::array<T, size> val_result {};
-					fn(str_result.data(), val_result.data());
-					return std::pair {str_result, val_result};
+					(get_and_fill_valid_enum_value.template operator()<Indices>(count, str_buffer, value_buffer), ...);
+					return count;
 				};
+				constexpr auto size = get_and_fill_valid_enum_values();
 
-				return internal(details::make_offset_sequence<Offset, Offset + Count>());
+				std::array<std::string_view, size> str_result {};
+				std::array<T, size> val_result {};
+				get_and_fill_valid_enum_values(str_result.data(), val_result.data());
+				return std::pair {str_result, val_result};
 			};
 
-			auto fn_iters =
-			  [&fn]<std::underlying_type_t<T>... Indices>(std::integer_sequence<std::underlying_type_t<T>, Indices...>)
+			auto split_into_iteration_packs_and_invoke = []<std::underlying_type_t<T>... Indices>(
+			  auto& get_all_valid_enum_values, std::integer_sequence<std::underlying_type_t<T>, Indices...>)
 			{
-				auto make_array = []<typename... Ts>(Ts&&... arrays) {
+				auto merge_results = []<typename... Ts>(Ts&&... arrays) {
 					constexpr auto total_size = details::get_array_pack_size<Ts...>::value;
 					std::array<std::string_view, total_size> res_string {};
 					std::array<T, total_size> res_values {};
@@ -510,15 +520,86 @@ namespace strenum
 					return std::pair {res_string, res_values};
 				};
 
-				return make_array(fn.template operator()<Begin + (Indices * PACK_SIZE), PACK_SIZE>()...,
-								  fn.template operator()<Begin + (iterations * PACK_SIZE), remainder>());
+				// returns all valid enum values for the given range [Offset, Offset + Count) as a
+				return merge_results(
+				  get_all_valid_enum_values(details::make_offset_sequence<Begin + (Indices * PACK_SIZE),
+																		  PACK_SIZE,
+																		  std::underlying_type_t<T>>())...,
+				  get_all_valid_enum_values(details::make_offset_sequence<Begin + (iterations * PACK_SIZE),
+																		  remainder,
+																		  std::underlying_type_t<T>>()));
 			};
-			return fn_iters(std::make_integer_sequence<std::underlying_type_t<T>, iterations>());
+			return split_into_iteration_packs_and_invoke(
+			  get_all_valid_enum_values, std::make_integer_sequence<std::underlying_type_t<T>, iterations>());
 		}
 	};
 
 	struct bitflag_searcher
-	{};
+	{
+		template <typename T, auto Begin, auto End>
+		consteval auto max_size() -> size_t
+		{
+			return (sizeof(std::underlying_type_t<T>) * 8) + 1;
+		}
+
+		template <typename T, auto Begin, auto End, auto GetEnumName>
+		consteval auto operator()() const noexcept
+		{
+			using underlying_t	= std::underlying_type_t<T>;
+			using index_t		= size_t;
+			constexpr auto BITS = sizeof(underlying_t) * 8;
+			static_assert(BITS <= sizeof(size_t) * 8, "No support for larger than `sizeof(size_t)` bytes");
+
+			// prepares an std::index_sequence<> where the indices are every bit value with added 0. I.e. it's a range
+			// that looks like: { 0, 1, 2, 4, 8, 16, 32, ..., 1 << (sizeof(underlying_t) * 8) }
+			constexpr auto bit_shift_indices = []<size_t... Indices>(std::index_sequence<Indices...>)
+			{
+				return std::index_sequence<0, size_t {1} << Indices...> {};
+			}
+			(std::make_index_sequence<BITS>());
+
+			// iterates over the indices, and fills in the values as needed. This version is simplified version of the
+			// `sequential_searcher` due to never hitting the CLang fold limit.
+			// returns the count of the valid enums, and if the *_buffer values are set, it fills in those values in the
+			// buffer.
+			constexpr auto get_and_fill_valid_enum_values =
+			  []<index_t... Indices>(std::integer_sequence<index_t, Indices...>,
+									 std::string_view* str_buffer = nullptr,
+									 T* value_buffer			  = nullptr) constexpr
+			{
+				size_t count {0};
+				auto get_and_fill_if_valid =
+				  []<auto Index>(auto& count, std::string_view* str_buffer = nullptr, T* value_buffer = nullptr)
+				{
+					constexpr auto enum_value {T {static_cast<std::underlying_type_t<T>>(Index)}};
+					constexpr auto name = GetEnumName.template operator()<enum_value>();
+					if(!name.empty())
+					{
+						if(str_buffer)
+						{
+							value_buffer[count] = enum_value;
+
+							// workaround for MSVC related ICE
+							// todo report the ICE, and verify for fix later
+							[]<details::fixed_string Str>(size_t index, auto& str_buffer) {
+								str_buffer[index] = Str;
+							}.template operator()<name>(count, str_buffer);
+						}
+						++count;
+					}
+				};
+
+				(get_and_fill_if_valid.template operator()<Indices>(count, str_buffer, value_buffer), ...);
+				return count;
+			};
+
+			constexpr auto SIZE = get_and_fill_valid_enum_values(bit_shift_indices);
+			std::array<std::string_view, SIZE> str {};
+			std::array<T, SIZE> vals {};
+			get_and_fill_valid_enum_values(bit_shift_indices, str.data(), vals.data());
+			return std::pair {str, vals};
+		}
+	};
 
 	template <details::IsValidStringifyableEnum T>
 	struct enum_information : public details::enum_start_t<T>, details::enum_end_t<T>
@@ -547,7 +628,7 @@ namespace strenum
 		template <typename T, auto Begin, auto End, typename Searcher, size_t KnownOffset, bool OnlyStrings = true>
 		consteval auto get_unique_entries()
 		{
-			constexpr auto MAXSIZE = End - Begin;
+			constexpr auto MAXSIZE = Searcher {}.template max_size<T, Begin, End>();
 			static_assert(
 			  MAXSIZE <= max_search_size<T>(),
 			  "Up the max search size for this enum. Either prefferably by specializing the 'enum_information<T>' and "
@@ -559,6 +640,9 @@ namespace strenum
 			static_assert(IsRequiredReturnType<T, std::remove_cvref_t<decltype(result)>>,
 						  "the result type should be of `std::pair<std::array<std::string_view, SIZE>, std::array<T, "
 						  "SIZE>>` from the searcher.");
+
+			static_assert(result.first.size() <= MAXSIZE,
+						  "Expected the Searcher{}.max_size() to be larger or equal to the resulting size");
 			if constexpr(OnlyStrings)
 			{
 				return result.first;
