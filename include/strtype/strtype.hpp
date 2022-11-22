@@ -46,6 +46,12 @@ namespace strtype
 			{
 				for(size_t i = 0; i != N; ++i) buf[i] = s[i];
 			}
+
+			consteval fixed_string(const std::array<char, N>& s)
+			{
+				for(size_t i = 0; i != N; ++i) buf[i] = s[i];
+				buf[N] = '\0';
+			}
 			auto operator<=>(const fixed_string&) const = default;
 
 			constexpr char operator[](size_t index) const noexcept { return buf[index]; }
@@ -63,9 +69,25 @@ namespace strtype
 				static_assert(end <= N + 1);
 				return fixed_string<end - start> {&buf[start]};
 			}
+
+			consteval auto reverse() const noexcept -> fixed_string<SIZE>
+			{
+				std::array<char, SIZE> copy {};
+				constexpr auto halfpoint = (SIZE - (SIZE % 2)) / 2;
+				for(size_t i = 0; i != halfpoint; ++i)
+				{
+					copy[i]			   = buf[SIZE - i - 1];
+					copy[SIZE - i - 1] = buf[i];
+				}
+				if(SIZE % 2 != 0) copy[halfpoint] = buf[halfpoint];
+				return fixed_string<SIZE>(copy.data());
+			}
 		};
 		template <unsigned N>
 		fixed_string(char const (&)[N]) -> fixed_string<N - 1>;
+
+		template <size_t N>
+		fixed_string(const std::array<char, N>) -> fixed_string<N>;
 #pragma endregion fixed_string
 #pragma region helpers
 		constexpr auto to_underlying(auto value) { return static_cast<std::underlying_type_t<decltype(value)>>(value); }
@@ -363,55 +385,119 @@ namespace strtype
 			return details::fixed_string {STRTYPE_SIG};
 		}
 
-		template <typename T>
-		consteval auto stringify_typename_offset()
+		struct typename_signature_offset
 		{
-			constexpr auto Str = get_signature<T>();
-			if(Str.size() == 0) throw std::exception();
-			size_t depth {0};
+			static constexpr size_t value = []() constexpr -> size_t {
+				constexpr auto full_signature = get_signature<void>();
+				size_t depth {0};
 #if defined(STRTYPE_MSVC)
-			for(auto i = 5; i < Str.size(); ++i)
-			{
-				auto index = (Str.size() - 1) - i;
-				if(Str[index] == '>')
+				for(auto i = 0; i < full_signature.size(); ++i)
 				{
-					++depth;
-				}
-				else if(Str[index] == '<')
-				{
-					--depth;
-					if(depth == 0)
+					size_t index = full_signature.size() - 1 - i;
+					if(full_signature[index] == '>')
 					{
-						return index + 1;
+						++depth;
+					}
+					else if(full_signature[index] == '<')
+					{
+						if(depth == 0)
+						{
+							throw std::exception();
+						}
+						--depth;
+						if(depth == 0)
+						{
+							return index + 1;
+						}
+					}
+				}
+#elif defined(STRTYPE_GNUG)
+				for(auto i = 0; i != full_signature.size(); ++i)
+				{
+					auto index = (full_signature.size() - 1) - i;
+					if(full_signature[index] == '=')
+					{
+						return index + 2;
+					}
+				}
+#endif
+				throw std::exception();
+			}();
+
+			template <fixed_string Str>
+			static constexpr auto transform()
+			{
+#if defined(STRTYPE_MSVC)
+				constexpr auto end_offset = 7;	  // sizeof(">(void)")
+#elif defined(STRTYPE_GNUG)
+				constexpr auto end_offset = 1;	  // sizeof("]")
+#endif
+				return Str.template substr<value, Str.size() - end_offset>();
+			}
+		};
+
+		constexpr auto get_scope_impl(std::string_view str, char* buffer = nullptr) -> size_t
+		{
+			size_t total_size {0};
+#if defined(STRTYPE_MSVC)
+			constexpr std::string_view STRUCT {"struct "};
+			constexpr std::string_view CLASS {"class "};
+#endif
+			for(auto i = 0; i < str.size(); ++i)
+			{
+#if defined(STRTYPE_MSVC)
+				if(str.substr(i, STRUCT.size()) == STRUCT)
+				{
+					i += STRUCT.size() - 1;
+				}
+				else if(str.substr(i, CLASS.size()) == CLASS)
+				{
+					i += CLASS.size() - 1;
+				}
+				else
+#endif
+				  if(str[i] == '<')
+				{
+					if(buffer) buffer[total_size] = str[i];
+					++total_size;
+				}
+				else if(str[i] == '>')
+				{
+					size_t to_modify = total_size;
+					if(str[i - 1] != ' ')
+					{
+						++total_size;
+					}
+					else
+					{
+						to_modify = total_size - 1;
+					}
+					if(buffer) buffer[to_modify] = str[i];
+				}
+				else
+				{
+					if(buffer) buffer[total_size] = str[i];
+					++total_size;
+					if(str[i] == ',' && str[i + 1] == ' ')
+					{
+						++i;
 					}
 				}
 			}
-#elif defined(STRTYPE_GNUG)
-			for(auto i = 0; i != Str.size(); ++i)
-			{
-				auto index = (Str.size() - 1) - i;
-				if(Str[index] == '=')
-				{
-					return index + 2;
-				}
-			}
-#endif
-			throw std::exception();	   // we couldn't find the start of the signature
+			return total_size;
 		}
 
-		template <typename T, size_t KnownOffset>
+		template <typename T>
 		consteval auto stringify_typename()
 		{
-			constexpr auto full_signature = details::get_signature<T>();
-			static_assert(full_signature.size() > KnownOffset);
-#if defined(STRTYPE_MSVC)
-			constexpr auto end_offset	= 7;	// sizeof(">(void)")
-			constexpr auto start_offset = full_signature[KnownOffset] == 's' ? 7 : 6;
-#elif defined(STRTYPE_GNUG)
-			constexpr auto end_offset	= 1;	// sizeof("]")
-			constexpr auto start_offset = 0;
-#endif
-			return full_signature.template substr<KnownOffset + start_offset, full_signature.size() - end_offset>();
+			constexpr auto str	  = typename_signature_offset {}.transform<get_signature<T>()>();
+			constexpr auto size	  = get_scope_impl(str);
+			constexpr auto result = []<size_t size>(std::string_view str) constexpr {
+				std::array<char, size> result {};
+				get_scope_impl(str, result.data());
+				return result;
+			}.template operator()<size>(str);
+			return fixed_string {result};
 		}
 
 		template <auto KnownValue>
@@ -751,7 +837,7 @@ namespace strtype
 		requires(!details::IsValidStringifyableEnum<T>)
 	consteval auto stringify()
 	{
-		return details::stringify_typename<T, details::stringify_typename_offset<void>()>();
+		return details::stringify_typename<T>();
 	}
 }	 // namespace strtype
 
