@@ -443,7 +443,7 @@ namespace strtype
 			constexpr std::string_view STRUCT {"struct "};
 			constexpr std::string_view CLASS {"class "};
 #endif
-			for(auto i = 0; i < str.size(); ++i)
+			for(size_t i = 0; i < str.size(); ++i)
 			{
 #if defined(STRTYPE_MSVC)
 				if(str.substr(i, STRUCT.size()) == STRUCT)
@@ -836,6 +836,12 @@ namespace strtype
 	template <typename T>
 		requires(!details::IsValidStringifyableEnum<T>)
 	consteval auto stringify()
+	{
+		return details::stringify_typename<T>();
+	}
+
+	template <typename T>
+	consteval auto stringify_typename()
 	{
 		return details::stringify_typename<T>();
 	}
