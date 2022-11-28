@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <compare>
 #include <string_view>
 #include <type_traits>
 
