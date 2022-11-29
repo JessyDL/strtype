@@ -172,8 +172,8 @@ TEST_CASE("stringify typename")
 TEST_CASE("stringify namespace")
 {
 	using namespace foos::dor::ri;
-	constexpr auto v = strtype::stringify<foobari<int>>();
+	constexpr auto v = strtype::stringify_namespace<foobari<int>>();
 	STATIC_REQUIRE(v == std::string_view {"foos::dor::ri"});
-	STATIC_REQUIRE(strtype::stringify<foobari<foobari<int>>>() == std::string_view {"foos::dor::ri"});
+	STATIC_REQUIRE(strtype::stringify_namespace<foobari<foobari<int>>>() == std::string_view {"foos::dor::ri"});
 	STATIC_REQUIRE(strtype::stringify_namespace<int>() == std::string_view {""});
 }
