@@ -79,7 +79,7 @@ namespace strtype
 	};
 }	 // namespace strtype
 
- TEST_CASE("large enum with extended search size")
+TEST_CASE("large enum with extended search size")
 {
 	constexpr auto values				= strtype::stringify<unreasonably_large>();
 	constexpr std::array correct_values = {"first", "some_other", "then_more", "and_more"};
@@ -89,7 +89,7 @@ namespace strtype
 	STATIC_REQUIRE(correct_values[1] == values[1]);
 	STATIC_REQUIRE(correct_values[2] == values[2]);
 	STATIC_REQUIRE(correct_values[3] == values[3]);
- }
+}
 
 enum class bit_ops : std::uint64_t
 {
@@ -167,4 +167,13 @@ TEST_CASE("stringify typename")
 				   std::string_view {"foos::dor::ri::foobari<foos::dor::ri::foobari<int>>"});
 	STATIC_REQUIRE(strtype::is_templated_type<foobari<int>>() == true);
 	STATIC_REQUIRE(strtype::is_templated_type<int>() == false);
+}
+
+TEST_CASE("stringify namespace")
+{
+	using namespace foos::dor::ri;
+	constexpr auto v = strtype::stringify<foobari<int>>();
+	STATIC_REQUIRE(v == std::string_view {"foos::dor::ri"});
+	STATIC_REQUIRE(strtype::stringify<foobari<foobari<int>>>() == std::string_view {"foos::dor::ri"});
+	STATIC_REQUIRE(strtype::stringify_namespace<int>() == std::string_view {""});
 }

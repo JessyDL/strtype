@@ -852,6 +852,19 @@ namespace strtype
 		return details::stringify_typename<T>();
 	}
 
+	template <typename T>
+	consteval auto stringify_namespace()
+	{
+		constexpr auto value = stringify_typename<T>();
+		constexpr auto end	 = [](std::string_view value) {
+			  auto offset = value.find('<');
+			  auto end = value.rfind(':', offset);
+			  return (end != std::string_view::npos && end > 0 && value[end - 1] == ':') ? end -1 : 0;
+		}(value);
+
+		return value.template substr<0, end>();
+	}
+
 	template<typename T>
 	consteval auto is_templated_type() noexcept -> bool
 	{
