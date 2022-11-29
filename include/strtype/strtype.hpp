@@ -83,6 +83,11 @@ namespace strtype
 				if(SIZE % 2 != 0) copy[halfpoint] = buf[halfpoint];
 				return fixed_string<SIZE>(copy.data());
 			}
+
+			constexpr auto begin() const noexcept { return buf; }
+			constexpr auto cbegin() const noexcept { return buf; }
+			constexpr auto end() const noexcept { return &buf[N]; }
+			constexpr auto cend() const noexcept { return &buf[N]; }
 		};
 		template <unsigned N>
 		fixed_string(char const (&)[N]) -> fixed_string<N - 1>;
@@ -845,6 +850,13 @@ namespace strtype
 	consteval auto stringify_typename()
 	{
 		return details::stringify_typename<T>();
+	}
+
+	template<typename T>
+	consteval auto is_templated_type() noexcept -> bool
+	{
+		constexpr auto value = stringify_typename<T>();
+		return std::find(std::begin(value), std::end(value), '<') != std::end(value);
 	}
 }	 // namespace strtype
 
