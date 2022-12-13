@@ -871,6 +871,13 @@ namespace strtype
 		constexpr auto value = stringify_typename<T>();
 		return std::find(std::begin(value), std::end(value), '<') != std::end(value);
 	}
+
+	template <details::IsValidStringifyableEnum T>
+	static constexpr auto stringify_enum(T value) -> std::string_view
+	{
+		static constexpr auto map = stringify_map<T>();
+		return map[value];
+	}
 }	 // namespace strtype
 
 #undef STRTYPE_MSVC
