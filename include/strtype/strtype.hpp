@@ -875,7 +875,7 @@ namespace strtype
 	template <details::IsValidStringifyableEnum T>
 	static constexpr auto stringify_enum(T value) -> std::string_view
 	{
-		static constexpr auto map = stringify_map<T>();
+		constexpr auto map = stringify_map<T>();
 		return map[value];
 	}
 }	 // namespace strtype
