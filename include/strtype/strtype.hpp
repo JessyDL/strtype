@@ -395,8 +395,8 @@ namespace strtype
 		{
 			static constexpr size_t value = []() constexpr -> size_t {
 				constexpr auto full_signature = get_signature<void>();
-				size_t depth {0};
 #if defined(STRTYPE_MSVC)
+				size_t depth {0};
 				for(auto i = 0; i < full_signature.size(); ++i)
 				{
 					size_t index = full_signature.size() - 1 - i;
@@ -511,8 +511,8 @@ namespace strtype
 		{
 			constexpr auto Str = get_signature<KnownValue>();
 			if(Str.size() == 0) throw std::exception();
-			size_t depth {0};
 #if defined(STRTYPE_MSVC)
+			size_t depth {0};
 			for(auto i = 5; i < Str.size(); ++i)
 			{
 				auto index = (Str.size() - 1) - i;
@@ -740,7 +740,6 @@ namespace strtype
 		consteval auto operator()() const noexcept
 		{
 			using underlying_t	= std::underlying_type_t<T>;
-			using index_t		= size_t;
 			constexpr auto BITS = sizeof(underlying_t) * 8;
 			static_assert(BITS <= sizeof(size_t) * 8, "No support for larger than `sizeof(size_t)` bytes");
 
