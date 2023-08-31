@@ -397,7 +397,7 @@ namespace strtype
 				constexpr auto full_signature = get_signature<void>();
 #if defined(STRTYPE_MSVC)
 				size_t depth {0};
-				for(auto i = 0; i < full_signature.size(); ++i)
+				for(size_t i = 0; i < full_signature.size(); ++i)
 				{
 					size_t index = full_signature.size() - 1 - i;
 					if(full_signature[index] == '>')
@@ -418,7 +418,7 @@ namespace strtype
 					}
 				}
 #elif defined(STRTYPE_GNUG)
-				for(auto i = 0; i != full_signature.size(); ++i)
+				for(size_t i = 0; i != full_signature.size(); ++i)
 				{
 					auto index = (full_signature.size() - 1) - i;
 					if(full_signature[index] == '=')
