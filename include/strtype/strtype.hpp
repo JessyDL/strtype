@@ -1,8 +1,8 @@
 #pragma once
 #include <algorithm>
 #include <array>
-#include <cstdint>
 #include <compare>
+#include <cstdint>
 #include <string_view>
 #include <type_traits>
 
@@ -82,6 +82,38 @@ namespace strtype
 				}
 				if(SIZE % 2 != 0) copy[halfpoint] = buf[halfpoint];
 				return fixed_string<SIZE>(copy.data());
+			}
+
+			template <unsigned M>
+			consteval auto prefix(char const (&value)[M]) const noexcept
+			{
+				return prefix(fixed_string<M - 1> {value});
+			}
+
+			template <size_t M>
+			consteval auto prefix(fixed_string<M> value) const noexcept -> fixed_string<N + M>
+			{
+				std::array<char, N + M> result {};
+				for(size_t i = 0; i < M; ++i) result[i] = value[i];
+				for(size_t i = 0; i < N; ++i) result[M + i] = buf[i];
+
+				return fixed_string<N + M>(result.data());
+			}
+
+			template <unsigned M>
+			consteval auto postfix(char const (&value)[M]) const noexcept
+			{
+				return postfix(fixed_string<M - 1> {value});
+			}
+
+			template <size_t M>
+			consteval auto postfix(fixed_string<M> value) const noexcept -> fixed_string<N + M>
+			{
+				std::array<char, N + M> result {};
+				for(size_t i = 0; i < N; ++i) result[i] = buf[i];
+				for(size_t i = 0; i < M; ++i) result[N + i] = value[i];
+
+				return fixed_string<N + M>(result.data());
 			}
 
 			constexpr auto begin() const noexcept { return buf; }
@@ -178,9 +210,9 @@ namespace strtype
 		// figure out if the Value is either an enum value of the given enum type, or equivalent to the underlying
 		// value;
 		template <typename T, auto Value>
-		concept IsEnumValueOrUnderlying = IsValidStringifyableEnum<T> &&
-										  (std::is_same_v<decltype(Value), T> ||
-										   std::is_same_v<decltype(Value), std::underlying_type_t<T>>);
+		concept IsEnumValueOrUnderlying =
+		  IsValidStringifyableEnum<T> &&
+		  (std::is_same_v<decltype(Value), T> || std::is_same_v<decltype(Value), std::underlying_type_t<T>>);
 
 		template <typename T, auto Value, bool ApplyOffset = false>
 			requires(IsEnumValueOrUnderlying<T, Value>)
@@ -638,9 +670,9 @@ namespace strtype
 														   T* value_buffer				= nullptr) constexpr {
 			size_t count = 0;
 
-			constexpr auto get_and_fill_valid_enum_value =
-			  []<auto Index>(auto& count, std::string_view* str_buffer, T* value_buffer) constexpr
-			{
+			constexpr auto get_and_fill_valid_enum_value = []<auto Index>(auto& count,
+																		  std::string_view* str_buffer,
+																		  T* value_buffer) constexpr {
 				constexpr auto get_enum_name = []<T value>() constexpr {
 					return details::stringify_value_impl<value,
 														 details::get_known_offset<T {enum_information<T>::BEGIN}>()>();
@@ -693,34 +725,34 @@ namespace strtype
 			constexpr underlying_t remainder  = (End - Begin) % PACK_SIZE;
 			constexpr underlying_t iterations = (End - Begin - remainder) / PACK_SIZE;
 
-			constexpr auto split_into_iteration_packs_and_invoke = []<std::underlying_type_t<T>... Indices>(
-			  std::integer_sequence<std::underlying_type_t<T>, Indices...>) constexpr
-			{
-				constexpr auto merge_results = []<typename... Ts>(Ts&&... arrays) constexpr {
-					constexpr auto total_size = details::get_array_pack_size<Ts...>::value;
-					std::array<std::string_view, total_size> res_string {};
-					std::array<T, total_size> res_values {};
-					size_t offset {0};
-					constexpr auto fill =
-					  [](auto& dst_str, auto& dst_values, const auto& src, size_t& offset) constexpr {
-						  for(size_t i = 0; i < src.first.size(); ++offset, ++i)
-						  {
-							  dst_str[offset]	 = src.first[i];
-							  dst_values[offset] = src.second[i];
-						  }
-					  };
-					(fill(res_string, res_values, arrays, offset), ...);
-					return std::pair {res_string, res_values};
-				};
+			constexpr auto split_into_iteration_packs_and_invoke =
+			  []<std::underlying_type_t<T>... Indices>(
+				std::integer_sequence<std::underlying_type_t<T>, Indices...>) constexpr {
+				  constexpr auto merge_results = []<typename... Ts>(Ts&&... arrays) constexpr {
+					  constexpr auto total_size = details::get_array_pack_size<Ts...>::value;
+					  std::array<std::string_view, total_size> res_string {};
+					  std::array<T, total_size> res_values {};
+					  size_t offset {0};
+					  constexpr auto fill =
+						[](auto& dst_str, auto& dst_values, const auto& src, size_t& offset) constexpr {
+							for(size_t i = 0; i < src.first.size(); ++offset, ++i)
+							{
+								dst_str[offset]	   = src.first[i];
+								dst_values[offset] = src.second[i];
+							}
+						};
+					  (fill(res_string, res_values, arrays, offset), ...);
+					  return std::pair {res_string, res_values};
+				  };
 
-				// returns all valid enum values for the given range [Offset, Offset + Count) as a
-				return merge_results(stringify<T>(details::make_offset_sequence<Begin + (Indices * PACK_SIZE),
-																				PACK_SIZE,
-																				std::underlying_type_t<T>>())...,
-									 stringify<T>(details::make_offset_sequence<Begin + (iterations * PACK_SIZE),
-																				remainder,
-																				std::underlying_type_t<T>>()));
-			};
+				  // returns all valid enum values for the given range [Offset, Offset + Count) as a
+				  return merge_results(stringify<T>(details::make_offset_sequence<Begin + (Indices * PACK_SIZE),
+																				  PACK_SIZE,
+																				  std::underlying_type_t<T>>())...,
+									   stringify<T>(details::make_offset_sequence<Begin + (iterations * PACK_SIZE),
+																				  remainder,
+																				  std::underlying_type_t<T>>()));
+			  };
 			return split_into_iteration_packs_and_invoke(
 			  std::make_integer_sequence<std::underlying_type_t<T>, iterations>());
 		}
@@ -745,11 +777,9 @@ namespace strtype
 
 			// prepares an std::index_sequence<> where the indices are every bit value with added 0. I.e. it's a range
 			// that looks like: { 0, 1, 2, 4, 8, 16, 32, ..., 1 << (sizeof(underlying_t) * 8) }
-			constexpr auto bit_shift_indices = []<size_t... Indices>(std::index_sequence<Indices...>) constexpr
-			{
+			constexpr auto bit_shift_indices = []<size_t... Indices>(std::index_sequence<Indices...>) constexpr {
 				return std::index_sequence<0, size_t {1} << Indices...> {};
-			}
-			(std::make_index_sequence<BITS>());
+			}(std::make_index_sequence<BITS>());
 
 			return stringify<T>(bit_shift_indices);
 		}
@@ -857,14 +887,14 @@ namespace strtype
 		constexpr auto value = stringify_typename<T>();
 		constexpr auto end	 = [](std::string_view value) {
 			  auto offset = value.find('<');
-			  auto end = value.rfind(':', offset);
-			  return (end != std::string_view::npos && end > 0 && value[end - 1] == ':') ? end -1 : 0;
+			  auto end	  = value.rfind(':', offset);
+			  return (end != std::string_view::npos && end > 0 && value[end - 1] == ':') ? end - 1 : 0;
 		}(value);
 
 		return value.template substr<0, end>();
 	}
 
-	template<typename T>
+	template <typename T>
 	consteval auto is_templated_type() noexcept -> bool
 	{
 		constexpr auto value = stringify_typename<T>();
